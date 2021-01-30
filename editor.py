@@ -54,6 +54,7 @@ class Editor:
     def commands(self, arguments: str) -> bool:
         arguments = arguments.split()
         if arguments[0].lower() == "speed":
+            self.pc = bl2tools.get_player_controller()
             self.pc.SpectatorCameraSpeed = int(arguments[1])
         elif arguments[0].lower() == "getscale":
             if self.curr_obj:
