@@ -50,4 +50,21 @@ that will add some further functionality to the editor.
 `mapeditor save <name>` -> save mapchanges for your current map to a file inside your Maps/ folder  
 
   
-  
+## Installation
+Download this mod from [here](https://github.com/juso40/BLMapEditor/archive/master.zip).   
+Extract all the files from the archive and move them into your games `Win32/Mods/` directory.  
+The files should have following structure:
+```
+└── Win32/
+    └── Mods/
+         └── MapEditor/
+             ├── __init__.py
+             ├── bl2tools.py
+             ├── commands.py
+             ├── editor.py
+             ├── settings.py
+             ├── Prefabs/*
+             ├── Maps/*
+             └── placeables/*
+               
+```
