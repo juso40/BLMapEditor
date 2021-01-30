@@ -1,0 +1,1 @@
+place your prefab_\<name\>.json files into this directory

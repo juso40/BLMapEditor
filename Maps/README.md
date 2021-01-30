@@ -1,0 +1,1 @@
+place your maps \<name\>.json files into this directory
