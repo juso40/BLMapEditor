@@ -156,6 +156,7 @@ class Editor:
                                 new_instance.set_rotation(tuple(attrs["Rotation"]))
                                 new_instance.set_scale(attrs["Scale"])
                                 self.objects_by_filter["Edited"].append(new_instance)
+                                self.objects_by_filter["All Components"].append(new_instance)
                                 break
 
         for uclass, to_edit in load_this.get("Edit", {}).items():
@@ -177,7 +178,8 @@ class Editor:
             with open(os.path.join(self.path, "Maps", f"{name}.json")) as fp:
                 save_this = json.load(fp)
 
-        save_this.setdefault(curr_map, {})
+        # let's overwrite the previous data for this map, as it will get added back anyways
+        save_this[curr_map] = {}
         for placeable in self.objects_by_filter["All Components"]:
             placeable.save_to_json(save_this[curr_map])
 
@@ -287,6 +289,8 @@ class Editor:
             if not self.curr_obj.b_dynamically_created:
                 self.objects_by_filter["Edited"].pop(self.objects_by_filter["Edited"].index(self.curr_obj))
                 self.object_index %= len(self.objects_by_filter[self.curr_filter])
+                self.curr_obj = None
+                self.b_move_curr_obj = False
 
             self.safe_feedback("Restored", "Successfully restored the objects defaults!", 4)
             return
@@ -305,7 +309,6 @@ class Editor:
             # add the default values to the default dict to revert changes if needed
             if self.b_move_curr_obj:
                 self.curr_obj.store_default_values(self.edited_default)
-            else:
                 if self.curr_filter != "Prefab Instances" and self.curr_obj not in self.objects_by_filter["Edited"]:
                     self.objects_by_filter["Edited"].append(self.curr_obj)
 

@@ -5,6 +5,7 @@ from unrealsdk import *
 
 try:
     from Mods.CommandExtensions import RegisterConsoleCommand, UnregisterConsoleCommand
+
     HAS_CE = True
 except ImportError:
     HAS_CE = False
@@ -60,8 +61,10 @@ class CECommandManager(CommandManager):
         def wrapper(args):
             if args.args:
                 fnc(args.args)
+
         parser = RegisterConsoleCommand(prefix, wrapper, splitter=self._splitter)
         parser.add_argument("args")
+        parser.add_argument("save")
 
     def enable(self):
         self.is_enabled = True
