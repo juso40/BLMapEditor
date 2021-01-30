@@ -68,3 +68,8 @@ The files should have following structure:
              └── placeables/*
                
 ```
+
+## Example
+I provided a small example in form of a parkour map in the Maps/folder. To load the map travel to "Claptraps Place" and 
+use the console command ``mapeditor load parkour``.  
+The parkour should then spawn in the games start location.
