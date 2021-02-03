@@ -1,18 +1,17 @@
-from typing import List, Dict
-from itertools import cycle
-
 import json
 import os
+from itertools import cycle
+from time import time
+from typing import Dict, List, cast
 
 import unrealsdk
 from unrealsdk import *
 
 from . import bl2tools
-from . import commands
 from . import canvasutils
-from . import settings
-
+from . import commands
 from . import placeables
+from . import settings
 
 __all__ = ["instance"]
 
@@ -22,34 +21,39 @@ class Editor:
         self.pc: unrealsdk.UObject = None
 
         commands.instance.add_command("mapeditor", self.commands)
-        self.path = os.path.dirname(os.path.realpath(__file__))
+        self.path: os.PathLike = os.path.dirname(os.path.realpath(__file__))
 
-        self.is_in_editor = False  # type: bool
-        self.pawn = None  # type: unrealsdk.UObject
+        self.is_in_editor: bool = False
+        self.pawn: unrealsdk.UObject = None
 
-        self.edit_modes = cycle(["Move", "Scale", "Rotate"])
+        self.edit_modes: cycle = cycle(["Move", "Scale", "Rotate"])
         self.curr_edit_mode = next(self.edit_modes)
 
-        self.rotator_names = cycle(["Pitch", "Yaw", "Roll"])
-        self.curr_rot_name = next(self.rotator_names)  # type: str
+        self.rotator_names: cycle = cycle(["Pitch", "Yaw", "Roll"])
+        self.curr_rot_name: str = next(self.rotator_names)
 
-        self.b_move_curr_obj = False  # type: bool
-        self.b_lock_curr_obj_loc = False  # type: bool
-        self.curr_obj = None  # type: placeables.AbstractPlaceable
-        self.object_index = 0  # type: int
-        self.default_editor_offset = 200  # type: int
-        self.editor_offset = self.default_editor_offset  # type: int
+        self.b_move_curr_obj: bool = False
+        self.b_lock_curr_obj_loc: bool = False
+        self.curr_obj: placeables.AbstractPlaceable = None
+        self.object_index: int = 0
+        self.default_editor_offset: int = 200
+        self.editor_offset: int = self.default_editor_offset
 
-        self.filter_names = cycle(["All Components", "Edited", "Create", "Prefab BP", "Prefab Instances"])
-        self.curr_filter = next(self.filter_names)  # type: str
-        self.objects_by_filter = {"All Components": [], "Edited": [], "Create": [],
-                                  "Prefab BP": [],
-                                  "Prefab Instances": []}  # type: Dict[str, List[placeables.AbstractPlaceable]]
+        self.filter_names: cycle = cycle(["All Components", "Edited", "Create", "Prefab BP", "Prefab Instances"])
+        self.curr_filter: str = next(self.filter_names)
+        self.objects_by_filter: Dict[str, List[placeables.AbstractPlaceable]] = {"All Components": [],
+                                                                                 "Edited": [],
+                                                                                 "Create": [],
+                                                                                 "Prefab BP": [],
+                                                                                 "Prefab Instances": []}
 
-        self.edited_default = {}  # type: dict  # used to restore default attrs
-        self.deleted = []  # type: List[placeables.AbstractPlaceable]
+        self.edited_default: dict = {}  # used to restore default attrs
+        self.deleted: List[placeables.AbstractPlaceable] = []
 
-        self.add_as_prefab = []  # type: List[placeables.AbstractPlaceable]  # the placeables you want to save as Prefab
+        self.add_as_prefab: List[placeables.AbstractPlaceable] = []  # the placeables you want to save as Prefab
+
+        self.curr_preview: placeables.AbstractPlaceable = None
+        self.delta_time: float = 0.0
 
     def commands(self, arguments: str) -> bool:
         arguments = arguments.split()
@@ -100,7 +104,7 @@ class Editor:
         elif arguments[0].lower() == "offset":
             try:
                 self.editor_offset = int(arguments[1])
-            except:
+            except ValueError:
                 unrealsdk.Log("Editor Offset only takes Integers.")
         elif arguments[0].lower() == "help":
             unrealsdk.Log(
@@ -153,8 +157,8 @@ class Editor:
                         for smc_bp in self.objects_by_filter["Create"]:  # type: placeables.AbstractPlaceable
                             if smc_bp.holds_object(obj):
                                 new_instance, created_smcs = smc_bp.instantiate()
-                                new_instance.set_location(tuple(attrs["Location"]))
-                                new_instance.set_rotation(tuple(attrs["Rotation"]))
+                                new_instance.set_location(attrs["Location"])
+                                new_instance.set_rotation(attrs["Rotation"])
                                 new_instance.set_scale(attrs["Scale"])
                                 self.objects_by_filter["Edited"].append(new_instance)
                                 self.objects_by_filter["All Components"].append(new_instance)
@@ -175,9 +179,11 @@ class Editor:
         curr_map = bl2tools.get_world_info().GetStreamingPersistentMapName().lower()
         save_this = {}
 
-        if os.path.isfile(os.path.join(self.path, "Maps", f"{name}.json")):
+        try:
             with open(os.path.join(self.path, "Maps", f"{name}.json")) as fp:
                 save_this = json.load(fp)
+        except FileNotFoundError:
+            pass
 
         # let's overwrite the previous data for this map, as it will get added back anyways
         save_this[curr_map] = {}
@@ -201,7 +207,9 @@ class Editor:
                 self.enable()
         elif not self.is_in_editor:
             return
-
+        elif key.Name == "Toggle Preview":
+            settings.b_show_preview = not settings.b_show_preview
+            self._calculate_preview()
         elif key.Name == "TP To Object":
             self._tp_to_selected_object()
         elif key.Name == "TP my Pawn to me":
@@ -237,7 +245,7 @@ class Editor:
     def _tp_to_selected_object(self) -> None:
         """
         This function gets called for the "TP to Obj" keybind.
-        If we are in "Create" or in "Prefabs" filter, dont do anything and tell the user.
+        If we are in "Create" or in "Prefabs" filter, don't do anything and tell the user.
         :return:
         """
         if self.curr_filter in ("Create", "Prefab BP"):
@@ -255,6 +263,8 @@ class Editor:
         if self.b_move_curr_obj:  # we don't want to switch object filter while moving an object
             return
 
+        # the important stuff
+
         self.curr_obj = None
         self.curr_filter = next(self.filter_names)
 
@@ -262,6 +272,17 @@ class Editor:
             self.curr_filter = next(self.filter_names)
         self.object_index = 0
         self.safe_feedback(self.curr_filter, "Cycled filter!", 4)
+
+        self._calculate_preview()
+
+    def _calculate_preview(self):
+        if self.curr_preview:
+            self.curr_preview.destroy()
+        if self.curr_filter == "Create" and settings.b_show_preview:
+            self.curr_preview = self.objects_by_filter["Create"][self.object_index].get_preview()
+        else:
+            self.curr_preview = None
+        self.delta_time = time()
 
     def _change_edit_mode(self) -> None:
         """
@@ -338,9 +359,9 @@ class Editor:
             try:
                 to_remove = self.curr_obj.destroy()
                 for remove_me in to_remove:
-                    for l in self.objects_by_filter.values():
+                    for _list in self.objects_by_filter.values():
                         try:
-                            l.pop(l.index(remove_me))
+                            _list.pop(_list.index(remove_me))
                         except ValueError:
                             pass
 
@@ -366,19 +387,38 @@ class Editor:
         self.pc.bCollideWorld = False
 
         def post_render(caller: unrealsdk.UObject, function: unrealsdk.UFunction, params: unrealsdk.FStruct) -> bool:
+            if not params.Canvas:
+                return True
+
             # draw useful information to screen, like current filter, current mesh name, b_lock_curr_pos
-            canvasutils.draw_text(params.Canvas, f"Editing Filter: {self.curr_filter}\n"
-                                                 f"Current Object Position Locked: {self.b_lock_curr_obj_loc}\n"
-                                                 f"Editor Offset: {self.editor_offset}\n"
-                                                 f"Editor Speed: {self.pc.SpectatorCameraSpeed}\n"
-                                                 f"Selecting Object {self.object_index}/"
-                                                 f"{len(self.objects_by_filter[self.curr_filter]) - 1}\n"
-                                                 f"Editing Rotation: {self.curr_rot_name}\n"
-                                                 f"Current Editor Mode: {self.curr_edit_mode}\n",
+            canvasutils.draw_text(params.Canvas,
+                                  f"Editing Filter: {self.curr_filter}\n"
+                                  f"Current Object Position Locked: {self.b_lock_curr_obj_loc}\n"
+                                  f"Editor Offset: {self.editor_offset}\n"
+                                  f"Editor Speed: {self.pc.SpectatorCameraSpeed}\n"
+                                  f"Selecting Object {self.object_index}/"
+                                  f"{len(self.objects_by_filter[self.curr_filter]) - 1}\n"
+                                  f"Editing Rotation: {self.curr_rot_name}\n"
+                                  f"Current Editor Mode: {self.curr_edit_mode}\n"
+                                  f"Show Preview: {settings.b_show_preview}\n",
                                   20, 20,
                                   settings.draw_debug_editor_info_scale,
                                   settings.draw_debug_editor_info_scale,
                                   settings.draw_debug_editor_info_color)
+
+            if settings.b_show_preview and self.curr_preview:
+                x, y, z = canvasutils.rot_to_vec3d([self.pc.CalcViewRotation.Pitch,
+                                                    self.pc.CalcViewRotation.Yaw - canvasutils.u_rotation_180 // 6,
+                                                    self.pc.CalcViewRotation.Roll])
+
+                now = time()
+                self.curr_preview.set_preview_location((self.pc.Location.X + x * 200,
+                                                        self.pc.Location.Y + y * 200,
+                                                        self.pc.Location.Z + z * 200))
+                self.curr_preview.add_rotation((0,
+                                                int((canvasutils.u_rotation_180 / 2.5) * (now - self.delta_time)),
+                                                0))
+                self.delta_time = now
 
             # highlight the currently selected prefab meshes
             for prefab_data in self.add_as_prefab:
@@ -393,9 +433,6 @@ class Editor:
                                                 self.pc.Location.Y + self.editor_offset * y,
                                                 self.pc.Location.Z + self.editor_offset * z))
 
-            if not params.Canvas:
-                return True
-
             if self.curr_obj:
                 self.curr_obj.draw_debug_box(self.pc)
                 self.curr_obj.draw_debug_origin(params.Canvas, self.pc)
@@ -408,8 +445,7 @@ class Editor:
 
             return True
 
-        def mouse_input_key(caller: unrealsdk.UObject, function: unrealsdk.UFunction,
-                            params: unrealsdk.FStruct) -> bool:
+        def handle_input(caller: unrealsdk.UObject, function: unrealsdk.UFunction, params: unrealsdk.FStruct) -> bool:
 
             """
             This function is only hooked to capture LeftMouseButton, RightMouseButton and MouseScroll, without
@@ -462,19 +498,24 @@ class Editor:
                 self.object_index = (self.object_index - 1) % len(self.objects_by_filter[self.curr_filter])
                 self.show_selected_obj(self.curr_filter, self.objects_by_filter[self.curr_filter],
                                        self.object_index)
+                self._calculate_preview()
             elif params.key == "MouseScrollDown":
                 self.object_index = (self.object_index + 1) % len(self.objects_by_filter[self.curr_filter])
                 self.show_selected_obj(self.curr_filter, self.objects_by_filter[self.curr_filter],
                                        self.object_index)
+                self._calculate_preview()
 
             return True
 
         unrealsdk.RegisterHook("WillowGame.WillowGameViewportClient.PostRender", __file__, post_render)
-        unrealsdk.RegisterHook("WillowGame.WillowUIInteraction.InputKey", __file__, mouse_input_key)
+        unrealsdk.RegisterHook("WillowGame.WillowUIInteraction.InputKey", __file__, handle_input)
 
     def disable(self) -> None:
         self.is_in_editor = False
         self.curr_obj = None
+        if self.curr_preview:
+            self.curr_preview.destroy()
+            self.curr_preview = None
 
         self.pc.Possess(self.pawn, True)
 

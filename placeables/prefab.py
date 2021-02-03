@@ -24,7 +24,7 @@ class Prefab(AbstractPlaceable):
         scale: float
 
     def __init__(self, name: str):
-        super().__init__(name)
+        super().__init__(name, "Prefab")
         self.component_data: List[Prefab.ComponentData] = []
 
     @staticmethod
@@ -124,6 +124,12 @@ class Prefab(AbstractPlaceable):
                                                            )
                                       )
         return ret, new_components
+
+    def get_preview(self) -> AbstractPlaceable:
+        return None
+
+    def set_preview_location(self, location: Tuple[float, float, float]) -> None:
+        return None
 
     def holds_object(self, uobject: str) -> bool:
         if not self.component_data:

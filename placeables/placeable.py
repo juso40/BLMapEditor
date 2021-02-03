@@ -8,8 +8,9 @@ from unrealsdk import *
 
 class AbstractPlaceable(ABC):
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, uclass: str):
         self.name: str = name
+        self.uclass: str = uclass
         self.b_dynamically_created: bool = False
         self.b_default_attributes: bool = True
         self.is_destroyed: bool = False
@@ -97,6 +98,24 @@ class AbstractPlaceable(ABC):
         If this object holds only a BP for a Placeable Component use this method to instantiate a new object
         associated with the actual in-game components.
         :return: The current object, and an iterator that holds all created objects
+        """
+        pass
+
+    @abstractmethod
+    def get_preview(self) -> AbstractPlaceable:
+        """
+        Return aa previewable version this object. An object returned by this function should have its location
+        only be changed using object.Translation
+        :return:
+        """
+        pass
+
+    @abstractmethod
+    def set_preview_location(self, location: Tuple[float, float, float]) -> None:
+        """
+        If this object is a preview, use this function to set its location.
+        :param location:
+        :return:
         """
         pass
 

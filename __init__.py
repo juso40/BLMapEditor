@@ -1,17 +1,16 @@
 import unrealsdk
 from unrealsdk import *
 
-from ..ModMenu import KeybindManager, Options, ModTypes, EnabledSaveType, SDKMod
-
-from . import commands
 from . import bl2tools
+from . import commands
 from . import editor
 from . import settings
+from ..ModMenu import EnabledSaveType, KeybindManager, ModTypes, Options, SDKMod
 
 
 class MapEditor(SDKMod):
     Name = "Map Editor"
-    Version = "0.9 Not so janky beta"
+    Version = "0.9 almost release ready Beta"
     Types = ModTypes.Utility | ModTypes.Content
     Description = f"Map Editor WIP.\n\n{Version}"
     Author = "Juso"
@@ -51,6 +50,7 @@ class MapEditor(SDKMod):
                 KeybindManager.Keybind("Cycle Pitch|Yaw|Roll", "X"),
                 KeybindManager.Keybind("Add/Remove to/from Prefab", "F4"),
                 KeybindManager.Keybind("TP my Pawn to me", "F5"),
+                KeybindManager.Keybind("Toggle Preview", "P")
                 ]
 
     def __init__(self):
@@ -87,9 +87,9 @@ class MapEditor(SDKMod):
         unrealsdk.RemoveHook("WillowGame.WillowPlayerController.WillowClientShowLoadingMovie",
                              __file__)
 
-    def GameInputPressed(self, event) -> None:
+    def GameInputPressed(self, bind) -> None:
         if self.pass_input:
-            self.Editor.game_input_pressed(event)
+            self.Editor.game_input_pressed(bind)
 
     def ModOptionChanged(self, option: unrealsdk.Options.Base, new_value) -> None:
         if option not in self.Options:

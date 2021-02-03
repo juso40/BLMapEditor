@@ -12,9 +12,10 @@ from .. import settings
 
 class StaticMeshComponent(AbstractPlaceable):
     def __init__(self, name: str, static_mesh: unrealsdk.UObject, sm_component: unrealsdk.UObject = None):
-        super().__init__(name)
+        super().__init__(name, "StaticMeshComponent")
         self.static_mesh: unrealsdk.UObject = static_mesh
-        self.sm_component: unrealsdk.UObject = sm_component
+        self.sm_component: unrealsdk.UObject = sm_component  # when destroyed, it will eventually get GC'ed,
+        self.sm_component_name: str = None  # but we may still need its name for saving it later to json
 
     def set_scale(self, scale: float) -> None:
         self.sm_component.SetScale(scale)
@@ -80,10 +81,9 @@ class StaticMeshComponent(AbstractPlaceable):
             canvasutils.draw_box(canvas, 5, 5, screen_x - 5, screen_y - 5, settings.draw_debug_origin_color)
 
     def instantiate(self) -> Tuple[AbstractPlaceable, List[AbstractPlaceable]]:
-        ret = StaticMeshComponent(self.name, self.static_mesh)
 
         new_smc = bl2tools.get_world_info().MyEmitterPool.GetFreeStaticMeshComponent(True)
-        ret.sm_component = new_smc
+        ret = StaticMeshComponent(self.name, self.static_mesh, new_smc)
         collection_actor = unrealsdk.FindAll("StaticMeshCollectionActor")[-1]
         new_smc.SetStaticMesh(ret.static_mesh, True)
         collection_actor.AttachComponent(new_smc)
@@ -95,6 +95,21 @@ class StaticMeshComponent(AbstractPlaceable):
 
         return ret, [ret, ]
 
+    def get_preview(self) -> AbstractPlaceable:
+        new_smc = bl2tools.get_world_info().MyEmitterPool.GetFreeStaticMeshComponent(True)
+        ret = StaticMeshComponent(self.name, self.static_mesh, new_smc)
+
+        new_smc.SetStaticMesh(ret.static_mesh, True)
+        bl2tools.get_world_info().MyEmitterPool.AttachComponent(new_smc)
+        bounds = ret.sm_component.Bounds
+        ret.set_scale(1 / (bounds.SphereRadius / 20))
+        ret.b_dynamically_created = True
+
+        return ret
+
+    def set_preview_location(self, location: Tuple[float, float, float]) -> None:
+        self.sm_component.Translation = location
+
     def holds_object(self, uobject: str) -> bool:
         return bl2tools.get_obj_path_name(self.sm_component) == uobject \
                or bl2tools.get_obj_path_name(self.static_mesh) == uobject
@@ -102,6 +117,9 @@ class StaticMeshComponent(AbstractPlaceable):
     def destroy(self) -> List[AbstractPlaceable]:
         if self.sm_component is None:  # if we don't have a SMC we can't destroy it
             raise ValueError("Cannot destroy not instantiated Object!")
+        # the sm_component may get GC'ed, but we need its name to save it later
+        if not self.b_dynamically_created:
+            self.sm_component_name = bl2tools.get_obj_path_name(self.sm_component)
         self.sm_component.DetachFromAny()
         self.is_destroyed = True
         return [self, ]
@@ -127,13 +145,13 @@ class StaticMeshComponent(AbstractPlaceable):
             return
         elif not self.b_dynamically_created and not self.b_default_attributes and not self.is_destroyed:
             smc_list = saved_json.setdefault("Edit", {}).setdefault("StaticMeshComponent", {})
-            smc_list[bl2tools.get_obj_path_name(self.sm_component)] = {"Location": list(self.get_location()),
-                                                                       "Rotation": list(self.get_rotation()),
-                                                                       "Scale": self.get_scale()}
+            smc_list[self.sm_component_name] = {"Location": list(self.get_location()),
+                                                "Rotation": list(self.get_rotation()),
+                                                "Scale": self.get_scale()}
 
         elif not self.b_dynamically_created and self.is_destroyed:
             smc_list = saved_json.setdefault("Destroy", {}).setdefault("StaticMeshComponent", [])
-            smc_list.append(bl2tools.get_obj_path_name(self.sm_component))
+            smc_list.append(self.sm_component_name)
 
         elif self.b_dynamically_created:
             smc_list = saved_json.setdefault("Create", {}).setdefault("StaticMesh", [])

@@ -21,7 +21,8 @@ Can be rebinded:
  - Backspace to reset the currently selected objects Position/Scale/Rotation to their default values
  - DEL to destroy the currently selected object
  - 0 to reset the objects distance/offset to your camera     
- - X to cycle trough the available object-Rotation modes 
+ - X to cycle trough the available object-Rotation modes   
+ - P to toggle the object preview on/off
 
 Cannot be rebinded:
   - LMB to start/stop moving the currently selected object  
