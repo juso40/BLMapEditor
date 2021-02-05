@@ -22,6 +22,7 @@ Can be rebinded:
  - DEL to destroy the currently selected object
  - 0 to reset the objects distance/offset to your camera     
  - X to cycle trough the available object-Rotation modes   
+ - U to switch between available Editor Modes  
  - P to toggle the object preview on/off
 
 Cannot be rebinded:
@@ -63,9 +64,11 @@ The files should have following structure:
              ├── bl2tools.py
              ├── commands.py
              ├── editor.py
+             ├── maploader.py
              ├── settings.py
              ├── Prefabs/*
              ├── Maps/*
+             ├── placeablehelper/*
              └── placeables/*
                
 ```
