@@ -4,13 +4,14 @@ from unrealsdk import *
 from . import bl2tools
 from . import commands
 from . import editor
+from . import maploader
 from . import settings
 from ..ModMenu import EnabledSaveType, KeybindManager, ModTypes, Options, SDKMod
 
 
 class MapEditor(SDKMod):
     Name = "Map Editor"
-    Version = "0.9 almost release ready Beta"
+    Version = "0.9 Not so janky beta"
     Types = ModTypes.Utility | ModTypes.Content
     Description = f"Map Editor WIP.\n\n{Version}"
     Author = "Juso"
@@ -50,11 +51,13 @@ class MapEditor(SDKMod):
                 KeybindManager.Keybind("Cycle Pitch|Yaw|Roll", "X"),
                 KeybindManager.Keybind("Add/Remove to/from Prefab", "F4"),
                 KeybindManager.Keybind("TP my Pawn to me", "F5"),
-                KeybindManager.Keybind("Toggle Preview", "P")
+                KeybindManager.Keybind("Toggle Preview", "P"),
+                KeybindManager.Keybind("Change Editor Mode", "U")
                 ]
 
     def __init__(self):
         self.Editor = editor.instance
+        self.MapLoader = maploader.instance
         self.pass_input = False
 
     def Enable(self) -> None:
@@ -63,12 +66,14 @@ class MapEditor(SDKMod):
 
         def end_load(caller: unrealsdk.UObject, function: unrealsdk.UFunction, params: unrealsdk.FStruct) -> bool:
             self.Editor.end_loading(bl2tools.get_world_info().GetStreamingPersistentMapName().lower())
+            self.MapLoader.end_loading(bl2tools.get_world_info().GetStreamingPersistentMapName().lower())
             return True
 
         def start_load(caller: unrealsdk.UObject, function: unrealsdk.UFunction, params: unrealsdk.FStruct) -> bool:
             if params.MovieName is None:
                 return True
             self.Editor.start_loading(params.MovieName.lower())
+            self.MapLoader.start_loading(params.MovieName.lower())
             return True
 
         unrealsdk.RegisterHook("WillowGame.WillowPlayerController.WillowClientDisableLoadingMovie",

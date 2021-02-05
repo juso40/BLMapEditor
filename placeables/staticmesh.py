@@ -23,6 +23,8 @@ class StaticMeshComponent(AbstractPlaceable):
         self.b_default_attributes = False
 
     def get_scale(self) -> float:
+        if not self.sm_component:
+            return 1
         return self.sm_component.Scale
 
     def add_scale(self, scale: float) -> None:
@@ -51,9 +53,13 @@ class StaticMeshComponent(AbstractPlaceable):
         self.sm_component.CachedParentToWorld.WPlane.Y = y
         self.sm_component.CachedParentToWorld.WPlane.Z = z
         self.sm_component.ForceUpdate(False)
+        self.sm_component.SetComponentRBFixed(True)
+
         self.b_default_attributes = False
 
     def get_location(self) -> iter:
+        if not self.sm_component:
+            return [0, 0, 0]
         return [self.sm_component.CachedParentToWorld.WPlane.X,
                 self.sm_component.CachedParentToWorld.WPlane.Y,
                 self.sm_component.CachedParentToWorld.WPlane.Z]
@@ -86,10 +92,10 @@ class StaticMeshComponent(AbstractPlaceable):
         ret = StaticMeshComponent(self.name, self.static_mesh, new_smc)
         collection_actor = unrealsdk.FindAll("StaticMeshCollectionActor")[-1]
         new_smc.SetStaticMesh(ret.static_mesh, True)
-        collection_actor.AttachComponent(new_smc)
         new_smc.SetBlockRigidBody(True)
-        new_smc.SetActorCollision(True, True)
+        new_smc.SetActorCollision(True, True, True)
         new_smc.SetTraceBlocking(True, True)
+        collection_actor.AttachComponent(new_smc)
 
         ret.b_dynamically_created = True
 
