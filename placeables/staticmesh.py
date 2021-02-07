@@ -151,9 +151,9 @@ class StaticMeshComponent(AbstractPlaceable):
             return
         elif not self.b_dynamically_created and not self.b_default_attributes and not self.is_destroyed:
             smc_list = saved_json.setdefault("Edit", {}).setdefault("StaticMeshComponent", {})
-            smc_list[self.sm_component_name] = {"Location": list(self.get_location()),
-                                                "Rotation": list(self.get_rotation()),
-                                                "Scale": self.get_scale()}
+            smc_list[bl2tools.get_obj_path_name(self.sm_component)] = {"Location": list(self.get_location()),
+                                                                       "Rotation": list(self.get_rotation()),
+                                                                       "Scale": self.get_scale()}
 
         elif not self.b_dynamically_created and self.is_destroyed:
             smc_list = saved_json.setdefault("Destroy", {}).setdefault("StaticMeshComponent", [])

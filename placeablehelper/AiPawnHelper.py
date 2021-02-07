@@ -30,6 +30,7 @@ class AiPawnHelper(PlaceableHelper):
     def on_disable(self):
         if self.curr_preview:
             self.curr_preview.destroy()
+            self.curr_preview = None
         self.curr_obj = None
 
     def on_command(self, command: str) -> bool:
@@ -175,18 +176,16 @@ class AiPawnHelper(PlaceableHelper):
 
     def load_map(self, map_data: dict) -> None:
 
-        for uclass, to_create in map_data.get("Create", {}).items():
-            for bp in to_create:
-                for obj, attrs in bp.items():
-                    if uclass == "AIPawnBalanceDefinition":
-                        for pawn_bp in self.objects_by_filter["Create"]:  # type: placeables.AbstractPlaceable
-                            if pawn_bp.holds_object(obj):
-                                new_instance, _ = pawn_bp.instantiate()
-                                new_instance.set_location(attrs.get("Location", (0, 0, 0)))
-                                new_instance.set_rotation(attrs.get("Rotation", (0, 0, 0)))
-                                new_instance.set_scale(attrs.get("Scale", 1))
-                                self.objects_by_filter["Edited"].append(new_instance)
-                                break
+        for bp in map_data.get("Create", {}).get("AIPawnBalanceDefinition", []):
+            for obj, attrs in bp.items():
+                for pawn_bp in self.objects_by_filter["Create"]:  # type: placeables.AbstractPlaceable
+                    if pawn_bp.holds_object(obj):
+                        new_instance, _ = pawn_bp.instantiate()
+                        new_instance.set_location(attrs.get("Location", (0, 0, 0)))
+                        new_instance.set_rotation(attrs.get("Rotation", (0, 0, 0)))
+                        new_instance.set_scale(attrs.get("Scale", 1))
+                        self.objects_by_filter["Edited"].append(new_instance)
+                        break
 
     def save_map(self, map_data: dict) -> None:
         for placeable in self.objects_by_filter["Edited"]:

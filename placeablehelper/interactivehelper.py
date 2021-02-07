@@ -11,16 +11,16 @@ from .. import placeables
 from .. import settings
 
 
-class SMCHelper(PlaceableHelper):
+class InterctiveObjectHelper(PlaceableHelper):
 
     def __init__(self):
-        super().__init__(name="Edit Components",
-                         supported_filters=["All Components", "Edited", "Create", "Prefab BP", "Prefab Instances"])
+        super().__init__(name="Edit InteractiveObject",
+                         supported_filters=["All Objects", "Create", "Edited"])
 
         self.edited_default: dict = {}  # used to restore default attrs
-        self.deleted: List[placeables.AbstractPlaceable] = []
 
         self.add_as_prefab: List[placeables.AbstractPlaceable] = []  # the placeables you want to save as Prefab
+        self.deleted: List[placeables.AbstractPlaceable] = []
 
         self.curr_preview: Optional[placeables.AbstractPlaceable] = None
         self.delta_time: float = 0.0
@@ -47,36 +47,12 @@ class SMCHelper(PlaceableHelper):
                 self.curr_obj.set_scale(float(cmd_list[1]))
             else:
                 unrealsdk.Log("No Object currently selected in Editor!")
-        elif cmd_list[0].lower() == "dump":
-            bl2tools.console_command(f"obj dump {bl2tools.get_obj_path_name(self.curr_obj.sm_component)}")
-        elif cmd_list[0].lower() == "clearprefab":
-            self.add_as_prefab.clear()
-        elif cmd_list[0].lower() == "saveprefab":
-            if not self.add_as_prefab:
-                unrealsdk.Log("No Components have been selected, can't create empty Prefab!")
-                return False
-            new_prefab_bp = placeables.Prefab.create_prefab_from_smc(self.add_as_prefab, cmd_list[1])
-            self.curr_obj = None  # we only have created a Prefab BP, no instance has been created
-            self.objects_by_filter["Prefab BP"].append(new_prefab_bp)
-            unrealsdk.Log(f"Saved Prefab as prefab_{cmd_list[1]}.json!")
-            self.add_as_prefab.clear()
-        elif cmd_list[0].lower() == "loadprefab":
-            new_prefab_bp = placeables.Prefab.load_prefab_json(cmd_list[1])
-            if new_prefab_bp:
-                self.objects_by_filter["Prefab BP"].append(new_prefab_bp)
-            return False
         else:
             return True
         return False
 
     def add_to_prefab(self) -> None:
-        if self.curr_filter not in ("Create", "Prefab BP", "Prefab Instances"):
-            try:
-                self.add_as_prefab.pop(
-                    self.add_as_prefab.index(self.objects_by_filter[self.curr_filter][self.object_index])
-                )
-            except ValueError:
-                self.add_as_prefab.append(self.objects_by_filter[self.curr_filter][self.object_index])
+        pass
 
     def add_rotation(self, rotator: tuple) -> None:
         if self.curr_obj:
@@ -89,7 +65,7 @@ class SMCHelper(PlaceableHelper):
             self.curr_obj.add_scale(scale)
 
     def tp_to_selected_object(self, pc: unrealsdk.UObject) -> bool:
-        if self.curr_filter in ("Create", "Prefab BP"):
+        if self.curr_filter == "Create":
             return False
         else:
             pc.Location = tuple(self.objects_by_filter[self.curr_filter][self.object_index].get_location())
@@ -124,7 +100,7 @@ class SMCHelper(PlaceableHelper):
             new_instance, created_smcs = self.objects_by_filter[self.curr_filter][self.object_index].instantiate()
             for smc in created_smcs:
                 self.objects_by_filter["Edited"].append(smc)
-                self.objects_by_filter["All Components"].append(smc)
+                self.objects_by_filter["All Objects"].append(smc)
             self.curr_obj = new_instance  # let's start editing this new object
             if self.curr_filter == "Prefab BP":
                 self.objects_by_filter["Prefab Instances"].append(new_instance)
@@ -151,7 +127,7 @@ class SMCHelper(PlaceableHelper):
                     self.object_index = 0
                 else:
                     self.object_index = (self.object_index - 1) % len(self.objects_by_filter[self.curr_filter])
-                bl2tools.feedback("Delete", "Successfully removed the SMC!", 4)
+                bl2tools.feedback("Delete", "Successfully removed the InteractiveObject!", 4)
             except ValueError as e:
                 bl2tools.feedback("Delete", str(e), 4)
 
@@ -179,10 +155,6 @@ class SMCHelper(PlaceableHelper):
                                             0))
             self.delta_time = now
 
-        # highlight the currently selected prefab meshes
-        for prefab_data in self.add_as_prefab:
-            prefab_data.draw_debug_box(pc)
-
         if self.curr_obj:
             self.curr_obj.draw_debug_box(pc)
             self.curr_obj.draw_debug_origin(canvas, pc)
@@ -205,31 +177,63 @@ class SMCHelper(PlaceableHelper):
         self.curr_preview = None
         self.object_index = 0
         self.objects_by_filter = {f: [] for f in self.available_filters}
-        self.deleted.clear()
         self.edited_default.clear()
         self.add_as_prefab.clear()
+        self.deleted.clear()
 
     def setup(self, mapname: str) -> None:
         if mapname == "menumap" or mapname == "none" or mapname == "":
             return
 
-        for x in unrealsdk.FindAll("StaticMeshCollectionActor"):
-            self.objects_by_filter["All Components"].extend([
-                placeables.StaticMeshComponent(bl2tools.get_obj_path_name(y.StaticMesh).split(".", 1)[-1],
-                                               y.StaticMesh, y) for y in x.AllComponents]
+        self.objects_by_filter["All Objects"].extend([
+            placeables.InteractiveObjectBalanceDefinition(
+                bl2tools.get_obj_path_name(x.BalanceDefinitionState.BalanceDefinition).split(".")[-1]
+                if x.BalanceDefinitionState.BalanceDefinition else
+                bl2tools.get_obj_path_name(x.InteractiveObjectDefinition).split(".")[-1],
+                x.BalanceDefinitionState.BalanceDefinition
+                if x.BalanceDefinitionState.BalanceDefinition else x.InteractiveObjectDefinition,
+                x
             )
-        self.objects_by_filter["All Components"].sort(key=lambda obj: obj.name)
-
-        for mesh in unrealsdk.FindAll("StaticMesh")[1:]:
-            self.objects_by_filter["Create"].append(
-                placeables.StaticMeshComponent(bl2tools.get_obj_path_name(mesh).split(".", 1)[-1], mesh)
+            for x in unrealsdk.FindAll("WillowInteractiveObject")[1:]]
+        )
+        self.objects_by_filter["All Objects"].extend([
+            placeables.InteractiveObjectBalanceDefinition(
+                bl2tools.get_obj_path_name(x.BalanceDefinitionState.BalanceDefinition).split(".")[-1]
+                if x.BalanceDefinitionState.BalanceDefinition else
+                bl2tools.get_obj_path_name(x.InteractiveObjectDefinition).split(".")[-1],
+                x.BalanceDefinitionState.BalanceDefinition
+                if x.BalanceDefinitionState.BalanceDefinition else x.InteractiveObjectDefinition,
+                x
             )
+            for x in unrealsdk.FindAll("WillowVendingMachine")[1:]]
+        )
+        self.objects_by_filter["All Objects"].extend([
+            placeables.InteractiveObjectBalanceDefinition(
+                bl2tools.get_obj_path_name(x.BalanceDefinitionState.BalanceDefinition).split(".")[-1]
+                if x.BalanceDefinitionState.BalanceDefinition else
+                bl2tools.get_obj_path_name(x.InteractiveObjectDefinition).split(".")[-1],
+                x.BalanceDefinitionState.BalanceDefinition
+                if x.BalanceDefinitionState.BalanceDefinition else x.InteractiveObjectDefinition,
+                x
+            )
+            for x in unrealsdk.FindAll("WillowVendingMachineBlackMarket")[1:]]
+        )
+        self.objects_by_filter["All Objects"].sort(key=lambda obj: obj.name)
+        #############################################################################
 
-        self.objects_by_filter["Create"].sort(key=lambda _x: _x.name)
+        interactives = unrealsdk.FindAll("InteractiveObjectBalanceDefinition")[1:]  # type: list
+        do_not_add = tuple(x.DefaultInteractiveObject for x in interactives)
+        interactives.extend([x for x in unrealsdk.FindAll("InteractiveObjectDefinition")[1:] if x not in do_not_add])
+
+        self.objects_by_filter["Create"].extend([
+            placeables.InteractiveObjectBalanceDefinition(bl2tools.get_obj_path_name(x).split(".")[-1], x)
+            for x in interactives]
+        )
+        self.objects_by_filter["Create"].sort(key=lambda obj: obj.name)
 
     def load_map(self, map_data: dict) -> None:
-        for to_destroy in map_data.get("Destroy", {}).get("StaticMeshComponent", []):
-            for placeable in self.objects_by_filter["All Components"]:  # type: placeables.AbstractPlaceable
+        for to_destroy in map_data.get("Destroy", {}).get("InteractiveObjectDefinition", []):
+            for placeable in self.objects_by_filter["All Objects"]:  # type: placeables.AbstractPlaceable
                 if placeable.holds_object(to_destroy):
                     to_remove = placeable.destroy()
                     for remove_me in to_remove:
@@ -240,20 +244,20 @@ class SMCHelper(PlaceableHelper):
                                 pass
                     break
 
-        for bp in map_data.get("Create", {}).get("StaticMesh", []):
+        for bp in map_data.get("Create", {}).get("InteractiveObjectDefinition", []):
             for obj, attrs in bp.items():
-                for smc_bp in self.objects_by_filter["Create"]:  # type: placeables.AbstractPlaceable
-                    if smc_bp.holds_object(obj):
-                        new_instance, created_smcs = smc_bp.instantiate()
+                for iodef in self.objects_by_filter["Create"]:  # type: placeables.AbstractPlaceable
+                    if iodef.holds_object(obj):
+                        new_instance, _ = iodef.instantiate()
                         new_instance.set_location(attrs["Location"])
                         new_instance.set_rotation(attrs["Rotation"])
                         new_instance.set_scale(attrs["Scale"])
                         self.objects_by_filter["Edited"].append(new_instance)
-                        self.objects_by_filter["All Components"].append(new_instance)
+                        self.objects_by_filter["All Objects"].append(new_instance)
                         break
 
-        for obj, attrs in map_data.get("Edit", {}).get("StaticMeshComponent", {}):
-            for placeable in self.objects_by_filter["All Components"]:
+        for obj, attrs in map_data.get("Edit", {}).get("InteractiveObjectDefinition", {}).items():
+            for placeable in self.objects_by_filter["All Objects"]:
                 if placeable.holds_object(obj):
                     placeable.set_location(attrs["Location"])
                     placeable.set_rotation(attrs["Rotation"])
@@ -262,7 +266,7 @@ class SMCHelper(PlaceableHelper):
                     break
 
     def save_map(self, map_data: dict) -> None:
-        for placeable in self.objects_by_filter["All Components"]:
+        for placeable in self.objects_by_filter["All Objects"]:
             placeable.save_to_json(map_data)
 
         for deleted in self.deleted:

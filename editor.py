@@ -31,7 +31,8 @@ class Editor:
         self.curr_rot_name: str = self.rotator_names[0]
 
         self.placeable_helpers: List[placeablehelper.PlaceableHelper] = [placeablehelper.SMCHelper,
-                                                                         placeablehelper.PawnHelper]
+                                                                         placeablehelper.PawnHelper,
+                                                                         placeablehelper.InteractiveHelper]
         self.curr_phelper: placeablehelper.PlaceableHelper = cast(placeablehelper.PlaceableHelper,
                                                                   self.placeable_helpers[0])
 
