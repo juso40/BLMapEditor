@@ -225,6 +225,18 @@ class InterctiveObjectHelper(PlaceableHelper):
         do_not_add = tuple(x.DefaultInteractiveObject for x in interactives)
         interactives.extend([x for x in unrealsdk.FindAll("InteractiveObjectDefinition")[1:] if x not in do_not_add])
 
+        this_crashes_so_remove_it = unrealsdk.FindObject("InteractiveObjectBalanceDefinition",
+                                                         "GD_Z2_TrailerTrashinData.BalanceDefs.BD_PropaneTank")
+        if this_crashes_so_remove_it:
+            try:
+                interactives.pop(interactives.index(this_crashes_so_remove_it))
+            except ValueError:
+                pass
+            try:
+                interactives.pop(interactives.index(this_crashes_so_remove_it.DefaultInteractiveObject))
+            except ValueError:
+                pass
+
         self.objects_by_filter["Create"].extend([
             placeables.InteractiveObjectBalanceDefinition(bl2tools.get_obj_path_name(x).split(".")[-1], x)
             for x in interactives]
