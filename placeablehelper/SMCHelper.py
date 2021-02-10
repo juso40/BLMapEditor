@@ -1,5 +1,5 @@
 from time import time
-from typing import List, Optional
+from typing import List, Tuple
 
 import unrealsdk
 from unrealsdk import *
@@ -18,21 +18,15 @@ class SMCHelper(PlaceableHelper):
                          supported_filters=["All Components", "Edited", "Create", "Prefab BP", "Prefab Instances"])
 
         self.edited_default: dict = {}  # used to restore default attrs
-        self.deleted: List[placeables.AbstractPlaceable] = []
 
         self.add_as_prefab: List[placeables.AbstractPlaceable] = []  # the placeables you want to save as Prefab
+        self.deleted: List[placeables.AbstractPlaceable] = []
 
-        self.curr_preview: Optional[placeables.AbstractPlaceable] = None
-        self.delta_time: float = 0.0
+    def on_enable(self) -> None:
+        super(SMCHelper, self).on_enable()
 
-    def on_enable(self):
-        pass
-
-    def on_disable(self):
-        if self.curr_preview:
-            self.curr_preview.destroy()
-            self.curr_preview = None
-        self.curr_obj = None
+    def on_disable(self) -> None:
+        super(SMCHelper, self).on_disable()
 
     def on_command(self, command: str) -> bool:
         cmd_list = command.split()
@@ -78,15 +72,28 @@ class SMCHelper(PlaceableHelper):
             except ValueError:
                 self.add_as_prefab.append(self.objects_by_filter[self.curr_filter][self.object_index])
 
+    def get_filter(self) -> str:
+        return super().get_filter()
+
+    def get_index_of_total(self) -> str:
+        return super().get_index_of_total()
+
+    def change_filter(self) -> None:
+        super().change_filter()
+
+    def index_up(self) -> Tuple[str, List[placeables.AbstractPlaceable], int]:
+        return super().index_up()
+
+    def index_down(self) -> Tuple[str, List[placeables.AbstractPlaceable], int]:
+        return super().index_down()
+
     def add_rotation(self, rotator: tuple) -> None:
         if self.curr_obj:
             self.curr_obj: placeables.AbstractPlaceable
             self.curr_obj.add_rotation(rotator)
 
     def add_scale(self, scale: float) -> None:
-        if self.curr_obj:
-            self.curr_obj: placeables.AbstractPlaceable
-            self.curr_obj.add_scale(scale)
+        super(SMCHelper, self).add_scale(scale)
 
     def tp_to_selected_object(self, pc: unrealsdk.UObject) -> bool:
         if self.curr_filter in ("Create", "Prefab BP"):
@@ -110,7 +117,6 @@ class SMCHelper(PlaceableHelper):
             bl2tools.feedback("Restored", "Successfully restored the objects defaults!", 4)
 
     def move_object(self, b_move: bool) -> None:
-
         if self.curr_filter not in ("Create", "Prefab BP"):
             self.curr_obj = self.objects_by_filter[self.curr_filter][self.object_index]
             # add the default values to the default dict to revert changes if needed
@@ -134,35 +140,27 @@ class SMCHelper(PlaceableHelper):
 
     def delete_object(self) -> None:
         if self.curr_obj:
-            try:
-                to_remove = self.curr_obj.destroy()
-                for remove_me in to_remove:
-                    for _list in self.objects_by_filter.values():
-                        try:
-                            _list.pop(_list.index(remove_me))
-                        except ValueError:
-                            pass
+            if not self.curr_obj.b_dynamically_created and self.curr_obj not in self.deleted:
+                self.deleted.append(self.curr_obj)
+            super(SMCHelper, self).delete_object()
 
-                if not self.curr_obj.b_dynamically_created and self.curr_obj not in self.deleted:
-                    self.deleted.append(self.curr_obj)
-                self.curr_obj = None
-                if not self.objects_by_filter[self.curr_filter]:
-                    self.change_filter()
-                    self.object_index = 0
-                else:
-                    self.object_index = (self.object_index - 1) % len(self.objects_by_filter[self.curr_filter])
-                bl2tools.feedback("Delete", "Successfully removed the SMC!", 4)
-            except ValueError as e:
-                bl2tools.feedback("Delete", str(e), 4)
+    def copy(self) -> None:
+        super().copy()
+
+    def paste(self) -> None:
+        self.clipboard: placeables.AbstractPlaceable
+        if self.clipboard and not self.clipboard.is_destroyed:
+            pasted, created = self.clipboard.instantiate()
+            pasted.set_scale(self.clipboard.get_scale())
+            pasted.set_rotation(self.clipboard.get_rotation())
+            pasted.set_location(self.clipboard.get_location())
+            self.objects_by_filter["Edited"].extend(created)
+            self.objects_by_filter["All Components"].extend(created)
+            if not self.curr_obj:
+                self.curr_obj = pasted
 
     def calculate_preview(self) -> None:
-        if self.curr_preview:
-            self.curr_preview.destroy()
-        if self.curr_filter == "Create" and settings.b_show_preview:
-            self.curr_preview = self.objects_by_filter["Create"][self.object_index].get_preview()
-        else:
-            self.curr_preview = None
-        self.delta_time = time()
+        super(SMCHelper, self).calculate_preview()
 
     def post_render(self, canvas: unrealsdk.UObject, pc: unrealsdk.UObject, offset: int, b_pos_locked: bool) -> None:
         if settings.b_show_preview and self.curr_preview:
@@ -190,9 +188,10 @@ class SMCHelper(PlaceableHelper):
                 x, y, z = canvasutils.rot_to_vec3d([pc.CalcViewRotation.Pitch,
                                                     pc.CalcViewRotation.Yaw,
                                                     pc.CalcViewRotation.Roll])
-                self.curr_obj.set_location((pc.Location.X + offset * x,
-                                            pc.Location.Y + offset * y,
-                                            pc.Location.Z + offset * z))
+                self.curr_obj.set_location(
+                    (canvasutils.round_to_multiple(pc.Location.X + offset * x, settings.editor_grid_size),
+                     canvasutils.round_to_multiple(pc.Location.Y + offset * y, settings.editor_grid_size),
+                     canvasutils.round_to_multiple(pc.Location.Z + offset * z, settings.editor_grid_size)))
         else:
             # Now let us highlight the currently selected object (does not need to be the moved object!)
             if not self.objects_by_filter[self.curr_filter]:
@@ -201,13 +200,10 @@ class SMCHelper(PlaceableHelper):
             self.objects_by_filter[self.curr_filter][self.object_index].draw_debug_origin(canvas, pc)
 
     def cleanup(self, mapname: str) -> None:
-        self.curr_obj = None
-        self.curr_preview = None
-        self.object_index = 0
-        self.objects_by_filter = {f: [] for f in self.available_filters}
-        self.deleted.clear()
+        super(SMCHelper, self).cleanup(mapname)
         self.edited_default.clear()
         self.add_as_prefab.clear()
+        self.deleted.clear()
 
     def setup(self, mapname: str) -> None:
         if mapname == "menumap" or mapname == "none" or mapname == "":
@@ -231,6 +227,7 @@ class SMCHelper(PlaceableHelper):
         for to_destroy in map_data.get("Destroy", {}).get("StaticMeshComponent", []):
             for placeable in self.objects_by_filter["All Components"]:  # type: placeables.AbstractPlaceable
                 if placeable.holds_object(to_destroy):
+                    self.deleted.append(placeable)
                     to_remove = placeable.destroy()
                     for remove_me in to_remove:
                         for _list in self.objects_by_filter.values():
@@ -245,9 +242,9 @@ class SMCHelper(PlaceableHelper):
                 for smc_bp in self.objects_by_filter["Create"]:  # type: placeables.AbstractPlaceable
                     if smc_bp.holds_object(obj):
                         new_instance, created_smcs = smc_bp.instantiate()
-                        new_instance.set_location(attrs["Location"])
-                        new_instance.set_rotation(attrs["Rotation"])
-                        new_instance.set_scale(attrs["Scale"])
+                        new_instance.set_location(attrs.get("Location", (0, 0, 0)))
+                        new_instance.set_rotation(attrs.get("Rotation", (0, 0, 0)))
+                        new_instance.set_scale(attrs.get("Scale", 1))
                         self.objects_by_filter["Edited"].append(new_instance)
                         self.objects_by_filter["All Components"].append(new_instance)
                         break
@@ -255,9 +252,9 @@ class SMCHelper(PlaceableHelper):
         for obj, attrs in map_data.get("Edit", {}).get("StaticMeshComponent", {}):
             for placeable in self.objects_by_filter["All Components"]:
                 if placeable.holds_object(obj):
-                    placeable.set_location(attrs["Location"])
-                    placeable.set_rotation(attrs["Rotation"])
-                    placeable.set_scale(attrs["Scale"])
+                    placeable.set_location(attrs.get("Location", (0, 0, 0)))
+                    placeable.set_rotation(attrs.get("Rotation", (0, 0, 0)))
+                    placeable.set_scale(attrs.get("Scale", 1))
                     self.objects_by_filter["Edited"].append(placeable)
                     break
 

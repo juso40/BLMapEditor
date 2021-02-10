@@ -39,7 +39,9 @@ class MapEditor(SDKMod):
                Options.Slider("Draw Debug Box Color.G", "Change the color for the debug box inside the Editor",
                               255, 0, 255, 1),
                Options.Slider("Draw Debug Box Color.B", "Change the color for the debug box inside the Editor",
-                              0, 0, 255, 1)
+                              0, 0, 255, 1),
+               Options.Slider("Editor Grid Snapsize", "If the Snapsize is '0' it will always update.",
+                              0, 0, 500, 1)
                ]
 
     Keybinds = [KeybindManager.Keybind("Restore Object Defaults", "Backspace"),
@@ -132,6 +134,8 @@ class MapEditor(SDKMod):
             x = list(settings.draw_debug_origin_color)
             x[0] = int(new_value)
             settings.draw_debug_origin_color = tuple(x)
+        elif option.Caption == "Editor Grid Snapsize":
+            settings.editor_grid_size = int(new_value)
 
 
 unrealsdk.RegisterMod(MapEditor())

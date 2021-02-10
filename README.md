@@ -27,6 +27,8 @@ Can be rebinded:
 
 Cannot be rebinded:
   - LMB to start/stop moving the currently selected object  
+  - Ctrl + C to add an Object to your 'clipboard'
+  - Ctrl + V to paste the Object in your 'clipboard'
   - If moving an object:
     - RMB to cycle trough available object edit modes
     - MouseWheelUp to increase offset/scale/rotation depending on edit mode
@@ -35,6 +37,9 @@ Cannot be rebinded:
     - RMB to cycle trough available object list filters
     - MouseWheelUp to move the current object list up
     - MouseWheelDown to move the current object list down
+    
+## Settings
+For further settings check the `Mods` settings menu in game.  
     
 ## Commands
 Because I cannot/won't add a keybind for everything I decided to add a list of new console commands 

@@ -42,6 +42,8 @@ class Editor:
         self.b_lock_pos: bool = False
         self.b_move_curr_obj: bool = False
 
+        self.is_ctrl_pressed: bool = False
+
     def commands(self, arguments: str) -> bool:
         if not self.curr_phelper.on_command(arguments):
             return False
@@ -84,6 +86,9 @@ class Editor:
         return False
 
     def load_map(self, name: str) -> None:
+        for helper in self.placeable_helpers:
+            helper.on_enable()  # make sure they are all enabled
+
         curr_map = bl2tools.get_world_info().GetStreamingPersistentMapName().lower()
         if os.path.isfile(os.path.join(self.path, "Maps", f"{name}.json")):
             with open(os.path.join(self.path, "Maps", f"{name}.json")) as fp:
@@ -228,8 +233,25 @@ class Editor:
         self.curr_phelper.delete_object()
         self.b_move_curr_obj = False
 
+    def _copy(self) -> None:
+        """
+        Add the current object to the "clipboard".
+        :return:
+        """
+        self.curr_phelper.copy()
+
+    def _paste(self) -> None:
+        """
+        Place the object from your current "clipboard" with the same attributes
+        :return:
+        """
+        self.curr_phelper.paste()
+        if not self.b_move_curr_obj:
+            self.b_move_curr_obj = True
+
     def enable(self) -> None:
         self.is_in_editor = True
+        bl2tools.get_world_info().bPlayersOnly = True
         self.pawn = self.pc.Pawn
         self.pc.ServerSpectate()
         self.pc.bCollideWorld = False
@@ -268,13 +290,24 @@ class Editor:
             :param params:
             :return:
             """
+            if params.Event == 1 and params.key == "LeftControl":
+                self.is_ctrl_pressed = False
+
             if params.Event != 0:  # only care for input pressed events
                 return True
 
-            if params.key not in ("MouseScrollUp", "MouseScrollDown", "LeftMouseButton", "RightMouseButton"):
+            if params.key not in ("MouseScrollUp", "MouseScrollDown",
+                                  "LeftMouseButton", "RightMouseButton",
+                                  "LeftControl", "C", "V", ):
                 return True
 
-            if params.key == "LeftMouseButton":
+            if params.key == "LeftControl":
+                self.is_ctrl_pressed = True
+            elif params.key == "C" and self.is_ctrl_pressed:
+                self._copy()
+            elif params.key == "V" and self.is_ctrl_pressed:
+                self._paste()
+            elif params.key == "LeftMouseButton":
                 self._move_object()
             elif params.key == "RightMouseButton":
                 self._change_filter()
@@ -321,6 +354,7 @@ class Editor:
 
     def disable(self) -> None:
         self.is_in_editor = False
+        bl2tools.get_world_info().bPlayersOnly = False
         self.curr_phelper.on_disable()
 
         self.pc.Possess(self.pawn, True)
@@ -343,7 +377,7 @@ class Editor:
         self.pc = bl2tools.get_player_controller()
 
         for helper in self.placeable_helpers:
-            helper.setup(map_name)
+            helper.b_setup = True
 
     def show_selected_obj(self, title, show_from, index):
         feedback = ""

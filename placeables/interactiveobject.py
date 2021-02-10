@@ -105,7 +105,7 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
             region_game_stage = max(pc.GetGameStageFromRegion(x.GameStageRegion)
                                     for x in regions if x.GameStageRegion)
         else:
-            region_game_stage = unrealsdk.FindAll("WillowPlayerPawn")[-1].GetGameStage()
+            region_game_stage = max(x.GetGameStage() for x in unrealsdk.FindAll("WillowPlayerPawn") if x.Arms)
 
         iobject.SetGameStage(region_game_stage)
         iobject.SetExpLevel(region_game_stage)

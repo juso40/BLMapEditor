@@ -7,8 +7,6 @@ u_rotation_180 = 32768
 u_pi = 3.1415926
 
 
-
-
 def rot_to_vec3d(rotation: list):
     f_yaw = rotation[1] * (u_pi / u_rotation_180)
     f_pitch = rotation[0] * (u_pi / u_rotation_180)
@@ -70,3 +68,7 @@ def draw_box(canvas, width, height, coord_x, coord_y, color):
 
 def clamp(value, _min, _max):
     return _min if value < _min else _max if value > _max else value
+
+
+def round_to_multiple(x: float, multiple: float) -> float:
+    return multiple * round(x / multiple) if multiple != 0.0 else x

@@ -1,7 +1,7 @@
 from .AiPawnHelper import AiPawnHelper
 from .SMCHelper import SMCHelper
 from .placeablehelper import PlaceableHelper
-from .interactivehelper import InterctiveObjectHelper
+from .IObjectHelper import InterctiveObjectHelper
 
 __all__ = ["SMCHelper", "PawnHelper", "PlaceableHelper", "InteractiveHelper"]
 

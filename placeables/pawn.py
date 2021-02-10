@@ -96,7 +96,7 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
             region_game_stage = max(pc.GetGameStageFromRegion(x.GameStageRegion)
                                     for x in regions if x.GameStageRegion)
         else:
-            region_game_stage = unrealsdk.FindAll("WillowPlayerPawn")[-1].GetGameStage()
+            region_game_stage = max(x.GetGameStage() for x in unrealsdk.FindAll("WillowPlayerPawn") if x.Arms)
         # PopulationFactoryBalancedAIPawn 105-120:
         pawn.SetGameStage(region_game_stage)
         pawn.SetExpLevel(region_game_stage)
@@ -129,8 +129,8 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
         if not self.ai_pawn:
             raise ValueError("Cannot destroy not instantiated Object!")
 
-        self.ai_pawn.Destroyed()
         self.set_location((-9999999, -9999999, -9999999))  # let's just move the pawn out of our sight
+        self.ai_pawn.Destroyed()
         self.set_scale(0)
         self.is_destroyed = True
         return [self, ]
