@@ -1,4 +1,4 @@
-from typing import List, Tuple, cast
+from typing import List, Tuple, cast, Union
 
 import unrealsdk
 from unrealsdk import *
@@ -8,12 +8,28 @@ from .. import bl2tools
 from .. import canvasutils
 from .. import settings
 
+from Mods.PyImgui import pyd_imgui
+
 
 class AIPawnBalanceDefinition(AbstractPlaceable):
     def __init__(self, name: str, ai_pawn_balance: unrealsdk.UObject, ai_pawn: unrealsdk.UObject = None):
         super().__init__(name, "AIPawnBalanceDefinition")
         self.ai_pawn_balance: unrealsdk.UObject = ai_pawn_balance
         self.ai_pawn: unrealsdk.UObject = ai_pawn
+
+    def get_materials(self) -> List[unrealsdk.UObject]:
+        if self.ai_pawn and self.ai_pawn.Mesh:
+            return [x for x in self.ai_pawn.Mesh.Materials]
+
+    def set_materials(self, materials: List[unrealsdk.UObject]) -> None:
+        if self.ai_pawn and self.ai_pawn.Mesh and materials is not None:
+            self.ai_pawn.Mesh.Materials = materials
+
+    def add_material(self, material: unrealsdk.UObject) -> None:
+        super().add_material(material)
+
+    def remove_material(self, material: unrealsdk.UObject = None, index: int = -1) -> None:
+        super().remove_material(material, index)
 
     def set_scale(self, scale: float) -> None:
         if self.ai_pawn:
@@ -27,30 +43,42 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
     def add_scale(self, scale: float) -> None:
         if self.ai_pawn:
             self.ai_pawn.Mesh.Scale += scale
+            self.ai_pawn.Mesh.ForceUpdate(True)
 
-    def set_rotation(self, rotator: iter) -> None:
+    def get_scale3d(self) -> List[float]:
+        if not self.ai_pawn:
+            return [1, 1, 1]
+        return [self.ai_pawn.Mesh.Scale3D.X, self.ai_pawn.Mesh.Scale3D.Y, self.ai_pawn.Mesh.Scale3D.Z]
+
+    def set_scale3d(self, scale3d: List[float]) -> None:
+        self.ai_pawn.Mesh.Scale3D = tuple(scale3d)
+        self.ai_pawn.Mesh.ForceUpdate(True)
+
+    def set_rotation(self, rotator: Union[List[int], Tuple[int, int, int]]) -> None:
         if self.ai_pawn:
             self.ai_pawn.Mesh.Rotation = tuple(rotator)
+            self.ai_pawn.Mesh.ForceUpdate(True)
 
-    def get_rotation(self) -> iter:
+    def get_rotation(self) -> List[int]:
         if not self.ai_pawn:
             return [0, 0, 0]
         return [self.ai_pawn.Mesh.Rotation.Pitch,
                 self.ai_pawn.Mesh.Rotation.Yaw,
                 self.ai_pawn.Mesh.Rotation.Roll]
 
-    def add_rotation(self, rotator: iter) -> None:
+    def add_rotation(self, rotator: Union[List[int], Tuple[int, int, int]]) -> None:
         if self.ai_pawn:
             pitch, yaw, roll = rotator
             self.ai_pawn.Mesh.Rotation.Pitch += pitch
             self.ai_pawn.Mesh.Rotation.Yaw += yaw
             self.ai_pawn.Mesh.Rotation.Roll += roll
+            self.ai_pawn.Mesh.ForceUpdate(True)
 
-    def set_location(self, position: iter) -> None:
+    def set_location(self, position: Union[List[float], Tuple[float, float, float]]) -> None:
         if self.ai_pawn:
             self.ai_pawn.Location = tuple(position)
 
-    def get_location(self) -> iter:
+    def get_location(self) -> List[float]:
         if not self.ai_pawn:
             return [0, 0, 0]
         return [self.ai_pawn.Location.X,
@@ -121,9 +149,8 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
     def set_preview_location(self, location: Tuple[float, float, float]) -> None:
         self.set_location(location)
 
-    def holds_object(self, uobject: str) -> bool:
-        return bl2tools.get_obj_path_name(self.ai_pawn_balance) == uobject \
-               or bl2tools.get_obj_path_name(self.ai_pawn) == uobject
+    def holds_object(self, uobject: unrealsdk.UObject) -> bool:
+        return self.ai_pawn_balance is uobject or self.ai_pawn is uobject
 
     def destroy(self) -> List[AbstractPlaceable]:
         if not self.ai_pawn:
@@ -143,6 +170,14 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
 
     def save_to_json(self, saved_json: dict) -> None:
         pawns = saved_json.setdefault("Create", {}).setdefault("AIPawnBalanceDefinition", [])
-        pawns.append({bl2tools.get_obj_path_name(self.ai_pawn_balance): {"Location": list(self.get_location()),
-                                                                         "Rotation": list(self.get_rotation()),
-                                                                         "Scale": self.get_scale()}})
+        pawns.append({bl2tools.get_obj_path_name(self.ai_pawn_balance): {"Location": self.get_location(),
+                                                                         "Rotation": self.get_rotation(),
+                                                                         "Scale": self.get_scale(),
+                                                                         "Scale3D": self.get_scale3d(),
+                                                                         "Materials":
+                                                                             [bl2tools.get_obj_path_name(x)
+                                                                              for x in self.get_materials()]
+                                                                         }})
+
+    def draw(self) -> None:
+        super().draw()

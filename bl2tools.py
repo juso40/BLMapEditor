@@ -9,36 +9,36 @@ def get_player_controller():
     return unrealsdk.GetEngine().GamePlayers[0].Actor
 
 
-def get_obj_path_name(object):
+def get_obj_path_name(uobject: unrealsdk.UObject):
     """
     Get the full correct name of the provided object.
-    :param object: UObject
+    :param uobject: UObject
     :return: String of the Path Name
     """
-    if object:
-        return object.PathName(object)
+    if uobject:
+        return uobject.PathName(uobject)
     else:
         return "None"
 
 
-def console_command(command, bWriteToLog=False):
+def console_command(command: str, write_to_log: bool = False):
     """
     Executes a normal console command
     :param command: String, the command to execute.
-    :param bWriteToLog: Bool, write to Log
+    :param write_to_log: Bool, write to Log
     :return: None
     """
-    get_player_controller().ConsoleCommand(command, bWriteToLog)
+    get_player_controller().ConsoleCommand(command, write_to_log)
 
 
-def obj_is_in_class(obj, inClass):
+def obj_is_in_class(uobject: unrealsdk.UObject, uclass: str):
     """
     Compares the given Objects class with the given class.
-    :param obj: UObject
-    :param inClass: String, the Class to compare with
-    :return: Bool, whether or not it's in the Class.
+    :param uobject: UObject
+    :param uclass: String, the Class to compare with
+    :return: Bool, whether it's in the Class.
     """
-    return bool(obj.Class == unrealsdk.FindClass(inClass))
+    return bool(uobject.Class == unrealsdk.FindClass(uclass))
 
 
 def get_weapon_holding():
@@ -53,7 +53,7 @@ def get_world_info():
     return unrealsdk.GetEngine().GetCurrentWorldInfo()
 
 
-def feedback(title, text, duration):
+def feedback(title: str, text: str, duration: float):
     pc = get_player_controller()
     if pc is not None:
         hud = pc.GetHUDMovie()

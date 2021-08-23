@@ -11,6 +11,8 @@ from .. import bl2tools
 from .. import placeables
 from .. import settings
 
+from ...PyImgui import pyd_imgui
+
 
 class PlaceableHelper(ABC):
 
@@ -26,57 +28,30 @@ class PlaceableHelper(ABC):
         self.clipboard: Optional[placeables.AbstractPlaceable] = None
         self.b_setup: bool = False
 
+        self.is_cache_dirty: bool = True
+        self._cached_objects_for_filter: List[placeables.AbstractPlaceable] = []
+        self._cached_names_for_filter: List[str] = []
+        self._search_string: str = ""
+
     def get_filter(self) -> str:
         return self.curr_filter
 
     def get_index_of_total(self) -> str:
-        return f"{self.object_index}/{len(self.objects_by_filter[self.curr_filter]) - 1}"
-
-    @abstractmethod
-    def on_command(self, command: str) -> bool:
-        """
-        Each editor mode should handle their own commands
-        :param command:
-        :return:
-        """
-        pass
+        return f"{self.object_index}/{len(self._cached_objects_for_filter) - 1}"
 
     def on_enable(self) -> None:
         if self.b_setup:
             self.setup(bl2tools.get_world_info().GetStreamingPersistentMapName().lower())
             self.b_setup = False
+        self.is_cache_dirty = True
 
     def on_disable(self) -> None:
         if self.curr_preview:
             self.curr_preview.destroy()
             self.curr_preview = None
-        self.curr_obj = None
-
-    def change_filter(self) -> None:
-        """
-        Change the objects filter.
-        :return:
-        """
-
-        self.curr_obj = None
-        self.curr_filter = self.available_filters[
-            (self.available_filters.index(self.curr_filter) + 1) % len(self.available_filters)
-            ]
-        if not any(self.objects_by_filter.values()):
-            return
-        while not self.objects_by_filter[self.curr_filter]:  # Edited/prefabs may be empty
-            self.curr_filter = self.available_filters[
-                (self.available_filters.index(self.curr_filter) + 1) % len(self.available_filters)
-                ]
-        self.object_index = 0
-
-    def index_up(self) -> Tuple[str, List[placeables.AbstractPlaceable], int]:
-        self.object_index = (self.object_index + 1) % len(self.objects_by_filter[self.curr_filter])
-        return self.curr_filter, self.objects_by_filter[self.curr_filter], self.object_index
-
-    def index_down(self) -> Tuple[str, List[placeables.AbstractPlaceable], int]:
-        self.object_index = (self.object_index - 1) % len(self.objects_by_filter[self.curr_filter])
-        return self.curr_filter, self.objects_by_filter[self.curr_filter], self.object_index
+        if self.curr_obj:
+            self.curr_obj: placeables.AbstractPlaceable
+            self.move_object()  # this will toggle our self.curr_obj to None and handle saving the current attributes
 
     @abstractmethod
     def add_to_prefab(self) -> None:
@@ -120,7 +95,7 @@ class PlaceableHelper(ABC):
         pass
 
     @abstractmethod
-    def move_object(self, b_move: bool) -> None:
+    def move_object(self) -> None:
         """
         Start/Stop moving the object.
         :return:
@@ -142,20 +117,17 @@ class PlaceableHelper(ABC):
                         pass
 
             self.curr_obj = None
-            if not self.objects_by_filter[self.curr_filter]:
-                self.change_filter()
-                self.object_index = 0
-            else:
-                self.object_index = (self.object_index - 1) % len(self.objects_by_filter[self.curr_filter])
-            bl2tools.feedback("Delete", "Successfully removed the Object!", 4)
+            self.object_index = -1
         except ValueError as e:
-            bl2tools.feedback("Delete", str(e), 4)
+            pass  # add to log
+        finally:
+            self.is_cache_dirty = True
 
     def copy(self) -> None:
         if self.curr_obj:
             self.clipboard = self.curr_obj
         else:
-            self.clipboard = self.objects_by_filter[self.curr_filter][self.object_index]
+            self.clipboard = self._cached_objects_for_filter[self.object_index]
 
     @abstractmethod
     def paste(self) -> None:
@@ -165,21 +137,67 @@ class PlaceableHelper(ABC):
         if self.curr_preview:
             self.curr_preview.destroy()
         if self.curr_filter == "Create" and settings.b_show_preview:
-            self.curr_preview = self.objects_by_filter["Create"][self.object_index].get_preview()
+            self.curr_preview = self._cached_objects_for_filter[self.object_index].get_preview()
         else:
             self.curr_preview = None
         self.delta_time = time()
 
-    @abstractmethod
-    def post_render(self, canvas: unrealsdk.UObject, pc: unrealsdk.UObject, offset: int, b_pos_locked: bool) -> None:
+    def get_names_for_filter(self) -> List[str]:
+        if self.is_cache_dirty:
+            self._cached_objects_for_filter = [
+                x for x in self.objects_by_filter.get(self.curr_filter, []) if self._search_string.lower() in x.name.lower()
+            ]
+            self._cached_names_for_filter = [f"{x.name}##{i}" for i, x in enumerate(self._cached_objects_for_filter)]
+            self.is_cache_dirty = False
+        return self._cached_names_for_filter
+
+    def post_render(self, pc: unrealsdk.UObject, offset: int) -> None:
         """
         Handle anything related to the canvas, will be called every game tick post render.
-        :param b_pos_locked:
         :param offset:
         :param pc:
-        :param canvas:
         :return:
         """
+
+        pyd_imgui.bullet_text(f"Current Object: {'None' if not self.curr_obj else self.curr_obj.name}")
+        pyd_imgui.bullet_text(f"Clipboard: {'None' if not self.clipboard else self.clipboard.name}")
+        pyd_imgui.separator()
+
+        combo_index = pyd_imgui.combo("Filters", self.available_filters.index(self.curr_filter), self.available_filters)
+        if combo_index[0]:
+            self._search_string = ""
+            self.object_index = -1
+            self.is_cache_dirty = True
+            self.curr_filter = self.available_filters[combo_index[1]]
+
+        in_text = pyd_imgui.input_text("Search", self._search_string, 20)
+        if in_text[0]:
+            self._search_string = in_text[1]
+            self.is_cache_dirty = True
+
+        if pyd_imgui.button("Copy"):
+            self.copy()
+        pyd_imgui.same_line()
+        if pyd_imgui.button("Paste"):
+            self.paste()
+
+        if self.curr_obj is None:
+            if pyd_imgui.button("Edit/Create Selected Object"):
+                self.move_object()
+        elif pyd_imgui.button("Done/ Deselect"):
+            self.move_object()
+        pyd_imgui.same_line()
+        if pyd_imgui.button("TP To Object"):
+            self.tp_to_selected_object(bl2tools.get_player_controller())
+        if pyd_imgui.button("Delete Object"):
+            self.delete_object()
+
+        list_selected = pyd_imgui.list_box_stretch(f"##{self.curr_filter}",
+                                                   self.object_index,
+                                                   self.get_names_for_filter())
+        if list_selected[0]:
+            self.object_index = list_selected[1]
+            self.calculate_preview()
 
     def cleanup(self, mapname: str) -> None:
         """
@@ -191,6 +209,8 @@ class PlaceableHelper(ABC):
         self.curr_preview = None
         self.object_index = 0
         self.objects_by_filter = {f: [] for f in self.available_filters}
+        self.is_cache_dirty = True
+        self._search_string = ""
 
     @abstractmethod
     def setup(self, mapname: str) -> None:

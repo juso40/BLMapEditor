@@ -1,5 +1,6 @@
 from time import time
-from typing import List, Tuple
+from typing import List, Tuple, Dict, cast
+from math import tan, radians
 
 import unrealsdk
 from unrealsdk import *
@@ -14,31 +15,13 @@ from .. import settings
 class AiPawnHelper(PlaceableHelper):
 
     def __init__(self):
-        super().__init__(name="Edit AiPawns",
-                         supported_filters=["Create", "Edited"])
+        super().__init__(name="Edit AiPawns", supported_filters=["Create", "Edited"])
 
     def on_enable(self) -> None:
         super(AiPawnHelper, self).on_enable()
 
     def on_disable(self) -> None:
         super(AiPawnHelper, self).on_disable()
-
-    def on_command(self, command: str) -> bool:
-        cmd_list = command.split()
-
-        if cmd_list[0].lower() == "getscale":
-            if self.curr_obj:
-                unrealsdk.Log(f"Current Object Scale: {self.curr_obj.get_scale()}")
-            else:
-                unrealsdk.Log("No Object currently selected in Editor!")
-        elif cmd_list[0].lower() == "setscale":
-            if self.curr_obj:
-                self.curr_obj.set_scale(float(cmd_list[1]))
-            else:
-                unrealsdk.Log("No Object currently selected in Editor!")
-        else:
-            return True
-        return False
 
     def add_to_prefab(self) -> None:
         pass
@@ -48,15 +31,6 @@ class AiPawnHelper(PlaceableHelper):
 
     def get_index_of_total(self) -> str:
         return super().get_index_of_total()
-
-    def change_filter(self) -> None:
-        super().change_filter()
-
-    def index_up(self) -> Tuple[str, List[placeables.AbstractPlaceable], int]:
-        return super().index_up()
-
-    def index_down(self) -> Tuple[str, List[placeables.AbstractPlaceable], int]:
-        return super().index_down()
 
     def add_rotation(self, rotator: tuple) -> None:
         super(AiPawnHelper, self).add_rotation(rotator)
@@ -68,30 +42,28 @@ class AiPawnHelper(PlaceableHelper):
         if self.curr_filter == "Create":
             return False
         else:
-            pc.Location = tuple(self.objects_by_filter[self.curr_filter][self.object_index].get_location())
+            pc.Location = tuple(self._cached_objects_for_filter[self.object_index].get_location())
             return True
 
     def restore_objects_defaults(self) -> None:
         bl2tools.feedback("Reset", "Cannot Reset custom AiPawn!", 4)
         return
 
-    def move_object(self, b_move: bool) -> None:
-
-        if self.curr_filter != "Create":
-            self.curr_obj = self.objects_by_filter[self.curr_filter][self.object_index]
-
-            if b_move:
+    def move_object(self) -> None:
+        if self.curr_obj:
+            self.curr_obj = None
+        else:
+            if self.curr_filter != "Create":
+                self.curr_obj = self._cached_objects_for_filter[self.object_index]
                 if self.curr_obj not in self.objects_by_filter["Edited"]:
                     self.objects_by_filter["Edited"].append(self.curr_obj)
 
-        elif self.curr_filter == "Create" and b_move:
-            # create a new instance from our Blueprint object
-            new_instance, created = self.objects_by_filter[self.curr_filter][self.object_index].instantiate()
-            self.objects_by_filter["Edited"].extend(created)
-            self.curr_obj = new_instance  # let's start editing this new object
-
-        if not b_move:
-            self.curr_obj = None
+            elif self.curr_filter == "Create":
+                # create a new instance from our Blueprint object
+                new_instance, created = self._cached_objects_for_filter[self.object_index].instantiate()
+                self.objects_by_filter["Edited"].extend(created)
+                self.curr_obj = new_instance  # let's start editing this new object
+        self.is_cache_dirty = True
 
     def delete_object(self) -> None:
         if self.curr_obj:
@@ -106,24 +78,31 @@ class AiPawnHelper(PlaceableHelper):
             pasted, created = self.clipboard.instantiate()
             pasted.set_scale(self.clipboard.get_scale())
             pasted.set_rotation(self.clipboard.get_rotation())
+            pasted.set_scale3d(self.clipboard.get_scale3d())
+            pasted.set_materials(self.clipboard.get_materials())
             pasted.set_location(self.clipboard.get_location())
             self.objects_by_filter["Edited"].extend(created)
             if not self.curr_obj:
                 self.curr_obj = pasted
+        self.is_cache_dirty = True
 
     def calculate_preview(self) -> None:
         super(AiPawnHelper, self).calculate_preview()
 
-    def post_render(self, canvas: unrealsdk.UObject, pc: unrealsdk.UObject, offset: int, b_pos_locked: bool) -> None:
+    def post_render(self, pc: unrealsdk.UObject, offset: int) -> None:
+        super().post_render(pc, offset)
+        x, y, z = canvasutils.rot_to_vec3d([pc.CalcViewRotation.Pitch,
+                                            pc.CalcViewRotation.Yaw,
+                                            pc.CalcViewRotation.Roll])
         if settings.b_show_preview and self.curr_preview:
-            x, y, z = canvasutils.rot_to_vec3d([pc.CalcViewRotation.Pitch + canvasutils.u_rotation_180 // 8,
-                                                pc.CalcViewRotation.Yaw - canvasutils.u_rotation_180 // 6,
-                                                pc.CalcViewRotation.Roll])
-
+            _x, _y = canvasutils.euler_rotate_vector_2d(0, 1, pc.CalcViewRotation.Yaw)
             now = time()
-            self.curr_preview.set_preview_location((pc.Location.X + x * 200,
-                                                    pc.Location.Y + y * 200,
-                                                    pc.Location.Z + z * 200))
+            w = tan(radians(pc.ToHFOV(pc.GetFOVAngle()) / 2)) * 200
+            _x *= (w - 80)
+            _y *= (w - 80)
+            self.curr_preview.set_preview_location((pc.Location.X + 200 * x - _x,
+                                                    pc.Location.Y + 200 * y - _y,
+                                                    pc.Location.Z + 200 * z))
             self.curr_preview.add_rotation((0,
                                             int((canvasutils.u_rotation_180 / 2.5) * (now - self.delta_time)),
                                             0))
@@ -131,21 +110,15 @@ class AiPawnHelper(PlaceableHelper):
 
         if self.curr_obj:
             self.curr_obj.draw_debug_box(pc)
-            self.curr_obj.draw_debug_origin(canvas, pc)
-            if not b_pos_locked:
-                x, y, z = canvasutils.rot_to_vec3d([pc.CalcViewRotation.Pitch,
-                                                    pc.CalcViewRotation.Yaw,
-                                                    pc.CalcViewRotation.Roll])
+            if not settings.b_lock_object_position:
                 self.curr_obj.set_location(
                     (canvasutils.round_to_multiple(pc.Location.X + offset * x, settings.editor_grid_size),
                      canvasutils.round_to_multiple(pc.Location.Y + offset * y, settings.editor_grid_size),
                      canvasutils.round_to_multiple(pc.Location.Z + offset * z, settings.editor_grid_size)))
         else:
             # Now let us highlight the currently selected object (does not need to be the moved object!)
-            if not self.objects_by_filter[self.curr_filter]:
-                self.change_filter()
-            self.objects_by_filter[self.curr_filter][self.object_index].draw_debug_box(pc)
-            self.objects_by_filter[self.curr_filter][self.object_index].draw_debug_origin(canvas, pc)
+            if self._cached_objects_for_filter:
+                self._cached_objects_for_filter[self.object_index].draw_debug_box(pc)
 
     def cleanup(self, mapname: str) -> None:
         super(AiPawnHelper, self).cleanup(mapname)
@@ -167,11 +140,20 @@ class AiPawnHelper(PlaceableHelper):
         for bp in map_data.get("Create", {}).get("AIPawnBalanceDefinition", []):
             for obj, attrs in bp.items():
                 for pawn_bp in self.objects_by_filter["Create"]:  # type: placeables.AbstractPlaceable
-                    if pawn_bp.holds_object(obj):
+                    if pawn_bp.holds_object(unrealsdk.FindObject("AIPawnBalanceDefinition", obj)):
                         new_instance, _ = pawn_bp.instantiate()
+                        new_instance: placeables.AIPawnBalanceDefinition
+
                         new_instance.set_location(attrs.get("Location", (0, 0, 0)))
                         new_instance.set_rotation(attrs.get("Rotation", (0, 0, 0)))
                         new_instance.set_scale(attrs.get("Scale", 1))
+                        new_instance.set_scale3d(attrs.get("Scale3D", (1, 1, 1)))
+
+                        mats = attrs.get("Materials", None)
+                        if mats is not None:
+                            mats = [unrealsdk.FindObject("MaterialInstanceConstant", m) for m in mats]
+                        new_instance.set_materials(mats)
+
                         self.objects_by_filter["Edited"].append(new_instance)
                         break
 

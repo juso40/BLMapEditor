@@ -1,5 +1,6 @@
 from time import time
 from typing import List, Tuple
+from math import tan, radians
 
 import unrealsdk
 from unrealsdk import *
@@ -28,64 +29,20 @@ class SMCHelper(PlaceableHelper):
     def on_disable(self) -> None:
         super(SMCHelper, self).on_disable()
 
-    def on_command(self, command: str) -> bool:
-        cmd_list = command.split()
-
-        if cmd_list[0].lower() == "getscale":
-            if self.curr_obj:
-                unrealsdk.Log(f"Current Object Scale: {self.curr_obj.get_scale()}")
-            else:
-                unrealsdk.Log("No Object currently selected in Editor!")
-        elif cmd_list[0].lower() == "setscale":
-            if self.curr_obj:
-                self.curr_obj.set_scale(float(cmd_list[1]))
-            else:
-                unrealsdk.Log("No Object currently selected in Editor!")
-        elif cmd_list[0].lower() == "dump":
-            bl2tools.console_command(f"obj dump {bl2tools.get_obj_path_name(self.curr_obj.sm_component)}")
-        elif cmd_list[0].lower() == "clearprefab":
-            self.add_as_prefab.clear()
-        elif cmd_list[0].lower() == "saveprefab":
-            if not self.add_as_prefab:
-                unrealsdk.Log("No Components have been selected, can't create empty Prefab!")
-                return False
-            new_prefab_bp = placeables.Prefab.create_prefab_from_smc(self.add_as_prefab, cmd_list[1])
-            self.curr_obj = None  # we only have created a Prefab BP, no instance has been created
-            self.objects_by_filter["Prefab BP"].append(new_prefab_bp)
-            unrealsdk.Log(f"Saved Prefab as prefab_{cmd_list[1]}.json!")
-            self.add_as_prefab.clear()
-        elif cmd_list[0].lower() == "loadprefab":
-            new_prefab_bp = placeables.Prefab.load_prefab_json(cmd_list[1])
-            if new_prefab_bp:
-                self.objects_by_filter["Prefab BP"].append(new_prefab_bp)
-            return False
-        else:
-            return True
-        return False
-
     def add_to_prefab(self) -> None:
         if self.curr_filter not in ("Create", "Prefab BP", "Prefab Instances"):
             try:
                 self.add_as_prefab.pop(
-                    self.add_as_prefab.index(self.objects_by_filter[self.curr_filter][self.object_index])
+                    self.add_as_prefab.index(self._cached_objects_for_filter[self.object_index])
                 )
             except ValueError:
-                self.add_as_prefab.append(self.objects_by_filter[self.curr_filter][self.object_index])
+                self.add_as_prefab.append(self._cached_objects_for_filter[self.object_index])
 
     def get_filter(self) -> str:
         return super().get_filter()
 
     def get_index_of_total(self) -> str:
         return super().get_index_of_total()
-
-    def change_filter(self) -> None:
-        super().change_filter()
-
-    def index_up(self) -> Tuple[str, List[placeables.AbstractPlaceable], int]:
-        return super().index_up()
-
-    def index_down(self) -> Tuple[str, List[placeables.AbstractPlaceable], int]:
-        return super().index_down()
 
     def add_rotation(self, rotator: tuple) -> None:
         if self.curr_obj:
@@ -99,7 +56,13 @@ class SMCHelper(PlaceableHelper):
         if self.curr_filter in ("Create", "Prefab BP"):
             return False
         else:
-            pc.Location = tuple(self.objects_by_filter[self.curr_filter][self.object_index].get_location())
+            x, y, z = self._cached_objects_for_filter[self.object_index].get_location()
+            _x, _y, _z = canvasutils.rot_to_vec3d([pc.CalcViewRotation.Pitch,
+                                                   pc.CalcViewRotation.Yaw,
+                                                   pc.CalcViewRotation.Roll])
+
+            pc.Location = (x - 200 * _x, y - 200 * _y, z - 200 * _z)
+
             return True
 
     def restore_objects_defaults(self) -> None:
@@ -111,32 +74,32 @@ class SMCHelper(PlaceableHelper):
             self.curr_obj.restore_default_values(self.edited_default)
             if not self.curr_obj.b_dynamically_created:
                 self.objects_by_filter["Edited"].pop(self.objects_by_filter["Edited"].index(self.curr_obj))
-                self.object_index %= len(self.objects_by_filter[self.curr_filter])
+                self.object_index %= len(self._cached_objects_for_filter)
             self.curr_obj = None
 
             bl2tools.feedback("Restored", "Successfully restored the objects defaults!", 4)
+        self.is_cache_dirty = True
 
-    def move_object(self, b_move: bool) -> None:
-        if self.curr_filter not in ("Create", "Prefab BP"):
-            self.curr_obj = self.objects_by_filter[self.curr_filter][self.object_index]
-            # add the default values to the default dict to revert changes if needed
-            if b_move:
+    def move_object(self) -> None:
+        if self.curr_obj:
+            self.curr_obj = None
+        else:
+            if self.curr_filter not in ("Create", "Prefab BP"):
+                self.curr_obj = self._cached_objects_for_filter[self.object_index]
+                # add the default values to the default dict to revert changes if needed
                 self.curr_obj.store_default_values(self.edited_default)
                 if self.curr_filter != "Prefab Instances" and self.curr_obj not in self.objects_by_filter["Edited"]:
                     self.objects_by_filter["Edited"].append(self.curr_obj)
-
-        elif self.curr_filter in ("Create", "Prefab BP") and b_move:
-            # create a new instance from our Blueprint object
-            new_instance, created_smcs = self.objects_by_filter[self.curr_filter][self.object_index].instantiate()
-            for smc in created_smcs:
-                self.objects_by_filter["Edited"].append(smc)
-                self.objects_by_filter["All Components"].append(smc)
-            self.curr_obj = new_instance  # let's start editing this new object
-            if self.curr_filter == "Prefab BP":
-                self.objects_by_filter["Prefab Instances"].append(new_instance)
-
-        if not b_move:
-            self.curr_obj = None
+            elif self.curr_filter in ("Create", "Prefab BP"):
+                # create a new instance from our Blueprint object
+                new_instance, created_smcs = self._cached_objects_for_filter[self.object_index].instantiate()
+                for smc in created_smcs:
+                    self.objects_by_filter["Edited"].append(smc)
+                    self.objects_by_filter["All Components"].append(smc)
+                self.curr_obj = new_instance  # let's start editing this new object
+                if self.curr_filter == "Prefab BP":
+                    self.objects_by_filter["Prefab Instances"].append(new_instance)
+        self.is_cache_dirty = True
 
     def delete_object(self) -> None:
         if self.curr_obj:
@@ -153,25 +116,32 @@ class SMCHelper(PlaceableHelper):
             pasted, created = self.clipboard.instantiate()
             pasted.set_scale(self.clipboard.get_scale())
             pasted.set_rotation(self.clipboard.get_rotation())
+            pasted.set_scale3d(self.clipboard.get_scale3d())
+            pasted.set_materials(self.clipboard.get_materials())
             pasted.set_location(self.clipboard.get_location())
             self.objects_by_filter["Edited"].extend(created)
             self.objects_by_filter["All Components"].extend(created)
             if not self.curr_obj:
                 self.curr_obj = pasted
+        self.is_cache_dirty = True
 
     def calculate_preview(self) -> None:
         super(SMCHelper, self).calculate_preview()
 
-    def post_render(self, canvas: unrealsdk.UObject, pc: unrealsdk.UObject, offset: int, b_pos_locked: bool) -> None:
+    def post_render(self, pc: unrealsdk.UObject, offset: int) -> None:
+        super().post_render(pc, offset)
+        x, y, z = canvasutils.rot_to_vec3d([pc.CalcViewRotation.Pitch,
+                                            pc.CalcViewRotation.Yaw,
+                                            pc.CalcViewRotation.Roll])
         if settings.b_show_preview and self.curr_preview:
-            x, y, z = canvasutils.rot_to_vec3d([pc.CalcViewRotation.Pitch,
-                                                pc.CalcViewRotation.Yaw - canvasutils.u_rotation_180 // 6,
-                                                pc.CalcViewRotation.Roll])
-
+            _x, _y = canvasutils.euler_rotate_vector_2d(0, 1, pc.CalcViewRotation.Yaw)
             now = time()
-            self.curr_preview.set_preview_location((pc.Location.X + x * 200,
-                                                    pc.Location.Y + y * 200,
-                                                    pc.Location.Z + z * 200))
+            w = tan(radians(pc.ToHFOV(pc.GetFOVAngle()) / 2)) * 200
+            _x *= (w - 80)
+            _y *= (w - 80)
+            self.curr_preview.set_preview_location((pc.Location.X + 200 * x - _x,
+                                                    pc.Location.Y + 200 * y - _y,
+                                                    pc.Location.Z + 200 * z))
             self.curr_preview.add_rotation((0,
                                             int((canvasutils.u_rotation_180 / 2.5) * (now - self.delta_time)),
                                             0))
@@ -183,21 +153,15 @@ class SMCHelper(PlaceableHelper):
 
         if self.curr_obj:
             self.curr_obj.draw_debug_box(pc)
-            self.curr_obj.draw_debug_origin(canvas, pc)
-            if not b_pos_locked:
-                x, y, z = canvasutils.rot_to_vec3d([pc.CalcViewRotation.Pitch,
-                                                    pc.CalcViewRotation.Yaw,
-                                                    pc.CalcViewRotation.Roll])
+            if not settings.b_lock_object_position:
                 self.curr_obj.set_location(
                     (canvasutils.round_to_multiple(pc.Location.X + offset * x, settings.editor_grid_size),
                      canvasutils.round_to_multiple(pc.Location.Y + offset * y, settings.editor_grid_size),
                      canvasutils.round_to_multiple(pc.Location.Z + offset * z, settings.editor_grid_size)))
         else:
             # Now let us highlight the currently selected object (does not need to be the moved object!)
-            if not self.objects_by_filter[self.curr_filter]:
-                self.change_filter()
-            self.objects_by_filter[self.curr_filter][self.object_index].draw_debug_box(pc)
-            self.objects_by_filter[self.curr_filter][self.object_index].draw_debug_origin(canvas, pc)
+            if self._cached_objects_for_filter:
+                self._cached_objects_for_filter[self.object_index].draw_debug_box(pc)
 
     def cleanup(self, mapname: str) -> None:
         super(SMCHelper, self).cleanup(mapname)
@@ -226,7 +190,7 @@ class SMCHelper(PlaceableHelper):
     def load_map(self, map_data: dict) -> None:
         for to_destroy in map_data.get("Destroy", {}).get("StaticMeshComponent", []):
             for placeable in self.objects_by_filter["All Components"]:  # type: placeables.AbstractPlaceable
-                if placeable.holds_object(to_destroy):
+                if placeable.holds_object(unrealsdk.FindObject("Object", to_destroy)):
                     self.deleted.append(placeable)
                     to_remove = placeable.destroy()
                     for remove_me in to_remove:
@@ -240,21 +204,38 @@ class SMCHelper(PlaceableHelper):
         for bp in map_data.get("Create", {}).get("StaticMesh", []):
             for obj, attrs in bp.items():
                 for smc_bp in self.objects_by_filter["Create"]:  # type: placeables.AbstractPlaceable
-                    if smc_bp.holds_object(obj):
+                    if smc_bp.holds_object(unrealsdk.FindObject("Object", obj)):
                         new_instance, created_smcs = smc_bp.instantiate()
+                        new_instance: placeables.StaticMeshComponent
+                        
                         new_instance.set_location(attrs.get("Location", (0, 0, 0)))
                         new_instance.set_rotation(attrs.get("Rotation", (0, 0, 0)))
                         new_instance.set_scale(attrs.get("Scale", 1))
+                        new_instance.set_scale3d(attrs.get("Scale3D", (1, 1, 1)))
+
+                        mats = attrs.get("Materials", None)
+                        if mats is not None:
+                            mats = [unrealsdk.FindObject("MaterialInstanceConstant", m) for m in mats]
+                        new_instance.set_materials(mats)
+
                         self.objects_by_filter["Edited"].append(new_instance)
                         self.objects_by_filter["All Components"].append(new_instance)
                         break
 
         for obj, attrs in map_data.get("Edit", {}).get("StaticMeshComponent", {}):
             for placeable in self.objects_by_filter["All Components"]:
-                if placeable.holds_object(obj):
+                if placeable.holds_object(unrealsdk.FindObject("Object", obj)):
+                    placeable: placeables.StaticMeshComponent
                     placeable.set_location(attrs.get("Location", (0, 0, 0)))
                     placeable.set_rotation(attrs.get("Rotation", (0, 0, 0)))
                     placeable.set_scale(attrs.get("Scale", 1))
+                    placeable.set_scale3d(attrs.get("Scale3D", (1, 1, 1)))
+
+                    mats = attrs.get("Materials", None)
+                    if mats is not None:
+                        mats = [unrealsdk.FindObject("MaterialInstanceConstant", m) for m in mats]
+                    placeable.set_materials(mats)
+
                     self.objects_by_filter["Edited"].append(placeable)
                     break
 

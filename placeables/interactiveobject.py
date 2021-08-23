@@ -1,4 +1,4 @@
-from typing import Tuple, List, cast
+from typing import Tuple, List, Union, cast
 
 import unrealsdk
 from unrealsdk import *
@@ -9,6 +9,8 @@ from .. import canvasutils
 from .. import bl2tools
 from .. import settings
 
+from Mods.PyImgui import pyd_imgui
+
 
 class InteractiveObjectBalanceDefinition(AbstractPlaceable):
     def __init__(self, name: str, iobject_definition: unrealsdk.UObject, iobject: unrealsdk.UObject = None):
@@ -16,6 +18,26 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
         self.io_definition: unrealsdk.UObject = iobject_definition
         self.iobject: unrealsdk.UObject = iobject
         self.io_name: str = ""
+
+    def get_materials(self) -> List[unrealsdk.UObject]:
+        if self.iobject and self.iobject.ObjectMesh:
+            return [x for x in self.iobject.ObjectMesh.Materials]
+        else:
+            return []
+
+    def set_materials(self, materials: List[unrealsdk.UObject]) -> None:
+        # because chests and some other IO generate Materials on spawning them, its very likely that the exported
+        # list of materials wont work, just to be safe, ignore all kind of materials for InteractiveObjects
+        # untill i find a better fix
+        return
+        if self.iobject and self.iobject.ObjectMesh and materials is not None:
+            self.iobject.ObjectMesh.Materials = materials
+
+    def add_material(self, material: unrealsdk.UObject) -> None:
+        super().add_material(material)
+
+    def remove_material(self, material: unrealsdk.UObject = None, index: int = -1) -> None:
+        super().remove_material(material, index)
 
     def set_scale(self, scale: float) -> None:
         if self.iobject:
@@ -31,19 +53,27 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
         if self.iobject:
             self.iobject.DrawScale += scale
 
-    def set_rotation(self, rotator: iter) -> None:
+    def get_scale3d(self) -> List[float]:
+        if not self.iobject:
+            return [1, 1, 1]
+        return [self.iobject.DrawScale3D.X, self.iobject.DrawScale3D.Y, self.iobject.DrawScale3D.Z]
+
+    def set_scale3d(self, scale3d: List[float]) -> None:
+        self.iobject.DrawScale3D = tuple(scale3d)
+
+    def set_rotation(self, rotator: Union[List[int], Tuple[int, int, int]]) -> None:
         if self.iobject:
             self.iobject.Rotation = tuple(rotator)
             self.b_default_attributes = False
 
-    def get_rotation(self) -> iter:
+    def get_rotation(self) -> List[int]:
         if not self.iobject:
             return [0, 0, 0]
         return [self.iobject.Rotation.Pitch,
                 self.iobject.Rotation.Yaw,
                 self.iobject.Rotation.Roll]
 
-    def add_rotation(self, rotator: iter) -> None:
+    def add_rotation(self, rotator: Union[List[int], Tuple[int, int, int]]) -> None:
         if self.iobject:
             pitch, yaw, roll = rotator
             self.iobject.Rotation.Pitch += pitch
@@ -51,25 +81,25 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
             self.iobject.Rotation.Roll += roll
             self.b_default_attributes = False
 
-    def set_location(self, position: iter) -> None:
+    def set_location(self, position: Union[List[float], Tuple[float, float, float]]) -> None:
         if self.iobject:
             self.iobject.Location = tuple(position)
             self.b_default_attributes = False
 
-    def get_location(self) -> iter:
+    def get_location(self) -> List[float]:
         if not self.iobject:
             return [0, 0, 0]
         return [self.iobject.Location.X,
                 self.iobject.Location.Y,
                 self.iobject.Location.Z]
 
-    def draw_debug_box(self, player_controller) -> None:
+    def draw_debug_box(self, player_controller: unrealsdk.UObject) -> None:
         if self.iobject:
             player_controller.DrawDebugSphere(tuple(self.get_location()),
                                               120, 1,
                                               *settings.draw_debug_box_color)
 
-    def draw_debug_origin(self, canvas, player_controller) -> None:
+    def draw_debug_origin(self, canvas: unrealsdk.UObject, player_controller: unrealsdk.UObject) -> None:
         if self.iobject:
             screen_x, screen_y = canvasutils.world_to_screen(canvas, self.get_location(),
                                                              [player_controller.CalcViewRotation.Pitch,
@@ -152,9 +182,8 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
     def set_preview_location(self, location: Tuple[float, float, float]) -> None:
         self.set_location(location)
 
-    def holds_object(self, uobject: str) -> bool:
-        return bl2tools.get_obj_path_name(self.io_definition) == uobject \
-               or bl2tools.get_obj_path_name(self.iobject) == uobject
+    def holds_object(self, uobject: unrealsdk.UObject) -> bool:
+        return self.io_definition is uobject or self.iobject is uobject
 
     def destroy(self) -> List[AbstractPlaceable]:
         if not self.iobject:
@@ -173,7 +202,9 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
             default_dict[bl2tools.get_obj_path_name(self.iobject)] = {
                 "Location": list(self.get_location()),
                 "Rotation": list(self.get_rotation()),
-                "Scale": self.get_scale()
+                "Scale": self.get_scale(),
+                "Scale3D": self.get_scale3d(),
+                "Materials": [bl2tools.get_obj_path_name(x) for x in self.get_materials()]
             }
 
     def restore_default_values(self, default_dict: dict) -> None:
@@ -182,6 +213,8 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
             self.set_scale(defaults["Scale"])
             self.set_location(defaults["Location"])
             self.set_rotation(defaults["Rotation"])
+            self.set_scale3d(defaults["Scale3D"])
+            self.set_materials(defaults["Materials"])
             self.b_default_attributes = True
 
     def save_to_json(self, saved_json: dict) -> None:
@@ -189,15 +222,28 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
             return
         elif not self.b_dynamically_created and not self.b_default_attributes and not self.is_destroyed:
             smc_list = saved_json.setdefault("Edit", {}).setdefault("InteractiveObjectDefinition", {})
-            smc_list[bl2tools.get_obj_path_name(self.iobject)] = {"Location": list(self.get_location()),
-                                                                  "Rotation": list(self.get_rotation()),
-                                                                  "Scale": self.get_scale()}
+            smc_list[bl2tools.get_obj_path_name(self.iobject)] = {"Location": self.get_location(),
+                                                                  "Rotation": self.get_rotation(),
+                                                                  "Scale": self.get_scale(),
+                                                                  "Scale3D": self.get_scale3d(),
+                                                                  "Materials":
+                                                                      [bl2tools.get_obj_path_name(x)
+                                                                       for x in self.get_materials()]
+                                                                  }
         elif not self.b_dynamically_created and self.is_destroyed:
             smc_list = saved_json.setdefault("Destroy", {}).setdefault("InteractiveObjectDefinition", [])
             smc_list.append(self.io_name)
 
         elif self.b_dynamically_created:
             create_me = saved_json.setdefault("Create", {}).setdefault("InteractiveObjectDefinition", [])
-            create_me.append({bl2tools.get_obj_path_name(self.io_definition): {"Location": list(self.get_location()),
-                                                                               "Rotation": list(self.get_rotation()),
-                                                                               "Scale": self.get_scale()}})
+            create_me.append({bl2tools.get_obj_path_name(self.io_definition): {"Location": self.get_location(),
+                                                                               "Rotation": self.get_rotation(),
+                                                                               "Scale": self.get_scale(),
+                                                                               "Scale3D": self.get_scale3d(),
+                                                                               "Materials":
+                                                                                   [bl2tools.get_obj_path_name(x)
+                                                                                    for x in self.get_materials()]
+                                                                               }})
+
+    def draw(self) -> None:
+        super().draw()

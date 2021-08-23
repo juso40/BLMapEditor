@@ -1,9 +1,20 @@
 from __future__ import annotations
-from typing import Tuple, Union, List
+
 from abc import ABC, abstractmethod
+from typing import List, Tuple, Union
 
 import unrealsdk
 from unrealsdk import *
+
+from .. import bl2tools
+from .. import canvasutils
+from .. import settings
+
+from ...PyImgui import pyd_imgui
+
+_material_instances: List[unrealsdk.UObject] = []
+_material_instances_filtered: List[unrealsdk.UObject] = []
+_material_instances_filtered_names: List[str] = []
 
 
 class AbstractPlaceable(ABC):
@@ -13,7 +24,41 @@ class AbstractPlaceable(ABC):
         self.uclass: str = uclass
         self.b_dynamically_created: bool = False
         self.b_default_attributes: bool = True
+        self.material_int: int = -1
+        self.new_material_int: int = -1
+        self.material_filter: str = ""
         self.is_destroyed: bool = False
+
+        self._material_window_open: bool = False
+
+    @abstractmethod
+    def get_materials(self) -> List[unrealsdk.UObject]:
+        """Get the list of MaterialInstanceConstants this object uses."""
+        pass
+
+    @abstractmethod
+    def set_materials(self, materials: List[unrealsdk.UObject]) -> None:
+        """Set the list of MaterialInstanceConstants for this object."""
+
+    def add_material(self, material: unrealsdk.UObject) -> None:
+        """Add a single MaterialInstanceConstant."""
+        materials = self.get_materials()
+        materials.append(material)
+        self.set_materials(materials)
+
+    def remove_material(self, material: unrealsdk.UObject = None, index: int = -1) -> None:
+        materials = self.get_materials()
+        if material:
+            try:
+                materials.remove(material)
+            except ValueError:
+                pass
+        elif index > -1:
+            try:
+                materials.pop(index)
+            except IndexError:
+                pass
+        self.set_materials(materials)
 
     @abstractmethod
     def set_scale(self, scale: float) -> None:
@@ -42,7 +87,14 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def set_rotation(self, rotator: iter) -> None:
+    def get_scale3d(self) -> List[float]:
+        pass
+
+    def set_scale3d(self, scale3d: List[float]) -> None:
+        pass
+
+    @abstractmethod
+    def set_rotation(self, rotator: Union[List[int], Tuple[int, int, int]]) -> None:
         """
         Set the objects absolute rotation.
         :param rotator:
@@ -51,7 +103,7 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def get_rotation(self) -> iter:
+    def get_rotation(self) -> List[int]:
         """
         Get the objects current rotation.
         :return:
@@ -59,7 +111,7 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def add_rotation(self, rotator: iter) -> None:
+    def add_rotation(self, rotator: Tuple[int, int, int]) -> None:
         """
         The given rotator will be added to the current rotation. Pitch += Pitch, Yaw+= Yaw, Roll += Roll
         :param rotator:
@@ -68,7 +120,7 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def set_location(self, position: iter) -> None:
+    def set_location(self, position: Union[List[float], Tuple[float, float, float]]) -> None:
         """
         Set this objects position to an absolute position.
         :param position: len(position) has to be 3
@@ -77,7 +129,7 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def get_location(self) -> iter:
+    def get_location(self) -> List[float]:
         """
         Get the objects Position in game.
         :return: iter of size 3, real position in game
@@ -85,11 +137,11 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def draw_debug_box(self, player_controller) -> None:
+    def draw_debug_box(self, player_controller: unrealsdk.UObject) -> None:
         pass
 
     @abstractmethod
-    def draw_debug_origin(self, canvas, player_controller) -> None:
+    def draw_debug_origin(self, canvas: unrealsdk.UObject, player_controller: unrealsdk.UObject) -> None:
         pass
 
     @abstractmethod
@@ -120,7 +172,7 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def holds_object(self, uobject: str) -> bool:
+    def holds_object(self, uobject: unrealsdk.UObject) -> bool:
         """
         Check if this Placeable holds the given UObject.
         :param uobject:
@@ -163,3 +215,79 @@ class AbstractPlaceable(ABC):
         :return:
         """
         pass
+
+    @abstractmethod
+    def draw(self) -> None:
+        pyd_imgui.push_item_width(-1)
+
+        pyd_imgui.text("Location (X, Y, Z)")
+        dragged_loc = pyd_imgui.drag_float3("##Location", self.get_location(), max(1, settings.editor_grid_size))
+        if dragged_loc[0]:
+            self.set_location(dragged_loc[1])
+            pc = bl2tools.get_player_controller()
+            pc.Rotation = tuple(canvasutils.rotate_to_location([pc.Location.X,
+                                                                pc.Location.Y,
+                                                                pc.Location.Z],
+                                                               dragged_loc[1]))
+        pyd_imgui.spacing()
+
+        pyd_imgui.text("Scale")
+        dragged_scale = pyd_imgui.drag_float("##Scale", self.get_scale(), 0.01)
+        if dragged_scale[0]:
+            self.set_scale(dragged_scale[1])
+
+        pyd_imgui.text("Scale3D")
+        dragged_scale3d = pyd_imgui.drag_float3("##Scale3D", self.get_scale3d(), 0.01)
+        if dragged_scale3d[0]:
+            self.set_scale3d(dragged_scale3d[1])
+
+        pyd_imgui.separator()
+
+        pyd_imgui.text("Rotation (Pitch, Yaw, Roll)")
+        dragged_rotation = pyd_imgui.drag_int3("##Rotation (Pitch, Yaw, Roll)", self.get_rotation(), 100)
+        if dragged_rotation[0]:
+            self.set_rotation(dragged_rotation[1])
+
+        pyd_imgui.spacing()
+
+        ################################################################################################################
+        # Begin Material Helper Window                                                                                 #
+        ################################################################################################################
+        if pyd_imgui.button("Add Material"):
+            self._material_window_open = True
+            _material_instances.extend(unrealsdk.FindAll("MaterialInstanceConstant")[1:])
+
+        if self._material_window_open:
+            global _material_instances_filtered, _material_instances_filtered_names
+            pyd_imgui.begin("MaterialWindow")
+            b_filtered, self.material_filter = pyd_imgui.input_text("Filter Materials", self.material_filter, 24)
+            if b_filtered:
+                _material_instances_filtered = [x for x in _material_instances
+                                                if self.material_filter.lower()
+                                                in bl2tools.get_obj_path_name(x).lower()]
+                _material_instances_filtered_names = [bl2tools.get_obj_path_name(x)
+                                                      for x in _material_instances_filtered]
+
+            self.new_material_int = pyd_imgui.list_box("##Materials",
+                                                       self.new_material_int,
+                                                       _material_instances_filtered_names)[1]
+
+            if pyd_imgui.button("Add Material"):
+                self.add_material(_material_instances_filtered[self.new_material_int])
+            if pyd_imgui.button("Remove Material"):
+                self.remove_material(material=_material_instances_filtered[self.new_material_int])
+            if pyd_imgui.button("Close"):
+                self._material_window_open = False
+                _material_instances.clear()
+                _material_instances_filtered.clear()
+            pyd_imgui.end()
+        ################################################################################################################
+        pyd_imgui.same_line()
+        if pyd_imgui.button("Remove Material"):
+            self.remove_material(index=self.material_int)
+        pyd_imgui.text("Materials")
+        self.material_int = pyd_imgui.list_box("##Materials",
+                                               self.material_int,
+                                               [bl2tools.get_obj_path_name(x) for x in self.get_materials()])[1]
+
+        pyd_imgui.pop_item_width()

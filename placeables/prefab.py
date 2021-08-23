@@ -131,7 +131,7 @@ class Prefab(AbstractPlaceable):
     def set_preview_location(self, location: Tuple[float, float, float]) -> None:
         return None
 
-    def holds_object(self, uobject: str) -> bool:
+    def holds_object(self, uobject: unrealsdk.UObject) -> bool:
         if not self.component_data:
             return False
         return any(x.data.holds_object(uobject) for x in self.component_data)
@@ -152,10 +152,10 @@ class Prefab(AbstractPlaceable):
     def get_rotation(self) -> iter:
         return [0, 0, 0]
 
-    def set_location(self, location):
+    def set_location(self, position: Union[List[float], Tuple[float, float, float]]):
         for smc in self.component_data:  # type: Prefab.ComponentData
             smc.data.set_location(
-                [location[0] + smc.offset[0], location[1] + smc.offset[1], location[2] + smc.offset[2]])
+                [position[0] + smc.offset[0], position[1] + smc.offset[1], position[2] + smc.offset[2]])
 
     def destroy(self) -> List[AbstractPlaceable]:
         remove = [self, ]
@@ -174,7 +174,7 @@ class Prefab(AbstractPlaceable):
             return
         self.component_data[0].data.draw_debug_origin(canvas, player_controller)
 
-    def get_location(self) -> iter:
+    def get_location(self) -> List[float]:
         return self.component_data[0].data.get_location()
 
     def add_rotation(self, rotator: iter) -> None:
@@ -222,3 +222,8 @@ class Prefab(AbstractPlaceable):
 
     def save_to_json(self, saved_json: dict) -> None:
         pass
+
+    def draw(self) -> None:
+        super().draw()
+
+
