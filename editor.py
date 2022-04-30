@@ -2,15 +2,13 @@ import json
 import os
 from typing import List, cast
 
+import imgui
 import unrealsdk
 from unrealsdk import *
 
 from . import bl2tools
 from . import placeablehelper
 from . import settings
-
-from .. import PyImgui
-from ..PyImgui import pyd_imgui
 
 __all__ = ["instance"]
 
@@ -110,7 +108,6 @@ class Editor:
                 self.disable()
             else:
                 self.enable()
-            PyImgui.toggle_gui()
         elif not self.is_in_editor:
             return
 
@@ -176,21 +173,21 @@ class Editor:
 
         :return:
         """
-        pyd_imgui.begin("Settings")
+        imgui.begin("Settings")
 
-        settings.b_lock_object_position = pyd_imgui.checkbox("Lock Object Position", settings.b_lock_object_position)[1]
-        pyd_imgui.same_line()
-        preview_checked = pyd_imgui.checkbox("Show Preview", settings.b_show_preview)
+        settings.b_lock_object_position = imgui.checkbox("Lock Object Position", settings.b_lock_object_position)[1]
+        imgui.same_line()
+        preview_checked = imgui.checkbox("Show Preview", settings.b_show_preview)
         if preview_checked[0]:
             settings.b_show_preview = preview_checked[1]
             self.curr_phelper.calculate_preview()
 
-        self.pc.SpectatorCameraSpeed = pyd_imgui.slider_float("Camera-Speed", self.pc.SpectatorCameraSpeed, 0, 20000)[1]
-        self.editor_offset = pyd_imgui.slider_float("Camera-Object Distance", self.editor_offset, 0, 2000)[1]
-        settings.editor_grid_size = pyd_imgui.slider_float("Grid Size", settings.editor_grid_size, 0, 500)[1]
+        self.pc.SpectatorCameraSpeed = imgui.slider_float("Camera-Speed", self.pc.SpectatorCameraSpeed, 0, 20000)[1]
+        self.editor_offset = imgui.slider_float("Camera-Object Distance", self.editor_offset, 0, 2000)[1]
+        settings.editor_grid_size = imgui.slider_float("Grid Size", settings.editor_grid_size, 0, 500)[1]
 
-        b_col = pyd_imgui.color_edit3("Debug Box Color", [x / 255 for x in settings.draw_debug_box_color],
-                                      pyd_imgui.COLOR_EDIT_FLAGS_PICKER_HUE_BAR)
+        b_col = imgui.color_edit3("Debug Box Color", *[x / 255 for x in settings.draw_debug_box_color],
+                                  imgui.COLOR_EDIT_PICKER_HUE_BAR)
 
         if b_col[0]:
             settings.draw_debug_box_color = [int(x * 255) for x in b_col[1]]
@@ -198,39 +195,39 @@ class Editor:
         # Debug Origin Slider not worth it
         # To use my current methods i need access to the Games Canvas
 
-        # b_col = pyd_imgui.color_edit3("Debug Origin Color",
+        # b_col = imgui.color_edit3("Debug Origin Color",
         #                               [x / 255 for x in settings.draw_debug_origin_color][2::-1],
-        #                               pyd_imgui.COLOR_EDIT_FLAGS_PICKER_HUE_BAR)
+        #                               imgui.COLOR_EDIT_FLAGS_PICKER_HUE_BAR)
         # if b_col[0]:
         #     settings.draw_debug_origin_color_color = tuple((list(*(int(x * 255) for x in b_col[1]))[::-1], 255))
 
-        pyd_imgui.end()
+        imgui.end()
 
     def render(self) -> None:
         self.draw_settings_menu()
 
-        pyd_imgui.begin("Placeables")
-        if pyd_imgui.begin_tab_bar("##Placeables"):
-            for ph in self.placeable_helpers:
-                if pyd_imgui.tab_item_button(ph.name):
-                    self.curr_phelper.on_disable()
-                    self.curr_phelper = ph
-                    self.curr_phelper.on_enable()
-            pyd_imgui.end_tab_bar()
+        imgui.begin("Placeables")
+
+        for ph in self.placeable_helpers:
+            imgui.same_line()
+            if imgui.button(ph.name):
+                self.curr_phelper.on_disable()
+                self.curr_phelper = ph
+                self.curr_phelper.on_enable()
         self.curr_phelper.post_render(self.pc, self.editor_offset)
 
-        if pyd_imgui.button("Save Map"):
+        if imgui.button("Save Map"):
             self.save_map(self.load_save_map_name)
-        pyd_imgui.same_line()
-        if pyd_imgui.button("Load Map"):
+        imgui.same_line()
+        if imgui.button("Load Map"):
             self.load_map(self.load_save_map_name)
-        self.load_save_map_name = pyd_imgui.input_text("Save/Load Name", self.load_save_map_name, 20)[1]
-        pyd_imgui.end()
+        self.load_save_map_name = imgui.input_text("Save/Load Name", self.load_save_map_name, 20)[1]
+        imgui.end()
 
-        pyd_imgui.begin("Object Attributes")
+        imgui.begin("Object Attributes")
         if self.curr_phelper.curr_obj:
             self.curr_phelper.curr_obj.draw()
-        pyd_imgui.end()
+        imgui.end()
 
     def enable(self) -> None:
         self.is_in_editor = True
@@ -241,16 +238,12 @@ class Editor:
         self.pc.bCollideWorld = False
         self.curr_phelper.on_enable()
 
-        PyImgui.subscribe_end_scene(self.render)
-
     def disable(self) -> None:
         self.is_in_editor = False
         bl2tools.get_world_info().bPlayersOnly = False
         self.curr_phelper.on_disable()
         self.pc.Possess(self.pawn, True)
         self.pc.DisplayHUD()
-
-        PyImgui.unsubscribe_end_scene(self.render)
 
     def start_loading(self, map_name: str) -> None:
         if not settings.b_editor_mode:

@@ -8,7 +8,7 @@ If you want to go ahead and mess around with it, but don't expect all your creat
 of the editor. As I continue to add features to the editor I may need to rewrite the map loading/saving.  
 
 ## Dependencies
-This mod depends on [PyImgui](https://bl-sdk.github.io/mods/PyImgui/) to draw the Editor GUI.  
+This mod depends on [blimgui](https://bl-sdk.github.io/mods/blimgui/) to draw the Editor GUI.  
 
 ## Controls
 Most controls can be rebinded inside the `Modded Keybinds` menu ingame.

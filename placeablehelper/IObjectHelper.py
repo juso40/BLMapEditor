@@ -1,6 +1,6 @@
 from math import radians, tan
 from time import time
-from typing import List, Tuple
+from typing import List
 
 import unrealsdk
 from unrealsdk import *

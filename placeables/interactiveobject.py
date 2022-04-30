@@ -9,7 +9,6 @@ from .. import canvasutils
 from .. import bl2tools
 from .. import settings
 
-from Mods.PyImgui import pyd_imgui
 
 
 class InteractiveObjectBalanceDefinition(AbstractPlaceable):
@@ -97,7 +96,7 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
         if self.iobject:
             player_controller.DrawDebugSphere(tuple(self.get_location()),
                                               120, 1,
-                                              *settings.draw_debug_box_color)
+                                              *settings.draw_debug_box_color, True, 0.01)
 
     def draw_debug_origin(self, canvas: unrealsdk.UObject, player_controller: unrealsdk.UObject) -> None:
         if self.iobject:

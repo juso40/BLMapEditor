@@ -4,16 +4,26 @@ from unrealsdk import *
 from . import bl2tools
 from . import editor
 from . import settings
+from .. import blimgui
+from ..ModMenu import EnabledSaveType, KeybindManager, ModTypes, SDKMod
 
-from ..ModMenu import EnabledSaveType, KeybindManager, ModTypes, SDKMod, SaveModSettings
+IMGUI_SHOW: bool = False
 
-from .. import PyImgui
-from ..PyImgui import pyd_imgui
+
+def _toggle() -> None:
+    global IMGUI_SHOW
+    if IMGUI_SHOW:
+        blimgui.close_window()
+        IMGUI_SHOW = False
+    else:
+        blimgui.create_window("Map Editor")
+        blimgui.set_draw_callback(instance.Editor.render)
+        IMGUI_SHOW = True
 
 
 class MapEditor(SDKMod):
     Name = "Map Editor"
-    Version = "1.2"
+    Version = "1.5"
     Types = ModTypes.Utility | ModTypes.Content
     Description = f"Map Editor."
     Author = "Juso"
@@ -28,7 +38,7 @@ class MapEditor(SDKMod):
                 KeybindManager.Keybind("Delete Obj", "Delete"),
                 KeybindManager.Keybind("TP my Pawn to me", "F5"),
                 KeybindManager.Keybind("Toggle Preview", "P"),
-                KeybindManager.Keybind("Toggle Editor Cursor", "Pos1", OnPress=lambda: PyImgui.toggle_cursor())
+                KeybindManager.Keybind("Toggle Editor Cursor", "Pos1", OnPress=_toggle)
                 ]
 
     def __init__(self):
@@ -82,4 +92,5 @@ class MapEditor(SDKMod):
             settings.editor_grid_size = int(new_value)
 
 
-unrealsdk.RegisterMod(MapEditor())
+instance = MapEditor()
+unrealsdk.RegisterMod(instance)

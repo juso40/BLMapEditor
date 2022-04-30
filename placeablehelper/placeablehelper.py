@@ -11,7 +11,7 @@ from .. import bl2tools
 from .. import placeables
 from .. import settings
 
-from ...PyImgui import pyd_imgui
+import imgui
 
 
 class PlaceableHelper(ABC):
@@ -142,13 +142,23 @@ class PlaceableHelper(ABC):
             self.curr_preview = None
         self.delta_time = time()
 
+    def draw_debug_box(self, pc: unrealsdk.UObject) -> None:
+        if self.curr_obj:
+            self.curr_obj: placeables.AbstractPlaceable
+            self.curr_obj.draw_debug_box(pc)
+
     def get_names_for_filter(self) -> List[str]:
         if self.is_cache_dirty:
             self._cached_objects_for_filter = [
-                x for x in self.objects_by_filter.get(self.curr_filter, []) if self._search_string.lower() in x.name.lower()
+                x for x in self.objects_by_filter.get(self.curr_filter, []) if
+                self._search_string.lower() in x.name.lower()
             ]
             self._cached_names_for_filter = [f"{x.name}##{i}" for i, x in enumerate(self._cached_objects_for_filter)]
             self.is_cache_dirty = False
+            try:
+                valid_index = self._cached_names_for_filter[self.object_index]
+            except IndexError:
+                self.object_index = -1
         return self._cached_names_for_filter
 
     def post_render(self, pc: unrealsdk.UObject, offset: int) -> None:
@@ -159,42 +169,43 @@ class PlaceableHelper(ABC):
         :return:
         """
 
-        pyd_imgui.bullet_text(f"Current Object: {'None' if not self.curr_obj else self.curr_obj.name}")
-        pyd_imgui.bullet_text(f"Clipboard: {'None' if not self.clipboard else self.clipboard.name}")
-        pyd_imgui.separator()
+        imgui.bullet_text(f"Current Object: {'None' if not self.curr_obj else self.curr_obj.name}")
+        imgui.bullet_text(f"Clipboard: {'None' if not self.clipboard else self.clipboard.name}")
+        imgui.separator()
 
-        combo_index = pyd_imgui.combo("Filters", self.available_filters.index(self.curr_filter), self.available_filters)
+        combo_index = imgui.combo("Filters", self.available_filters.index(self.curr_filter), self.available_filters)
         if combo_index[0]:
             self._search_string = ""
             self.object_index = -1
             self.is_cache_dirty = True
             self.curr_filter = self.available_filters[combo_index[1]]
 
-        in_text = pyd_imgui.input_text("Search", self._search_string, 20)
+        in_text = imgui.input_text("Search", self._search_string, 20)
         if in_text[0]:
             self._search_string = in_text[1]
             self.is_cache_dirty = True
 
-        if pyd_imgui.button("Copy"):
+        if imgui.button("Copy"):
             self.copy()
-        pyd_imgui.same_line()
-        if pyd_imgui.button("Paste"):
+        imgui.same_line()
+        if imgui.button("Paste"):
             self.paste()
 
         if self.curr_obj is None:
-            if pyd_imgui.button("Edit/Create Selected Object"):
+            if imgui.button("Edit/Create Selected Object"):
                 self.move_object()
-        elif pyd_imgui.button("Done/ Deselect"):
+        elif imgui.button("Done/ Deselect"):
             self.move_object()
-        pyd_imgui.same_line()
-        if pyd_imgui.button("TP To Object"):
+        imgui.same_line()
+        if imgui.button("TP To Object"):
             self.tp_to_selected_object(bl2tools.get_player_controller())
-        if pyd_imgui.button("Delete Object"):
+        if imgui.button("Delete Object"):
             self.delete_object()
 
-        list_selected = pyd_imgui.list_box_stretch(f"##{self.curr_filter}",
-                                                   self.object_index,
-                                                   self.get_names_for_filter())
+        list_selected = imgui.listbox(f"##{self.curr_filter}",
+                                      self.object_index,
+                                      self.get_names_for_filter(),
+                                      32)
         if list_selected[0]:
             self.object_index = list_selected[1]
             self.calculate_preview()

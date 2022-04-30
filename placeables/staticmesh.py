@@ -9,8 +9,6 @@ from .. import canvasutils
 from .. import bl2tools
 from .. import settings
 
-from Mods.PyImgui import pyd_imgui
-
 
 class StaticMeshComponent(AbstractPlaceable):
     def __init__(self, name: str, static_mesh: unrealsdk.UObject, sm_component: unrealsdk.UObject = None):
@@ -99,7 +97,7 @@ class StaticMeshComponent(AbstractPlaceable):
                                            (self.sm_component.Bounds.BoxExtent.X,
                                             self.sm_component.Bounds.BoxExtent.Y,
                                             self.sm_component.Bounds.BoxExtent.Z),
-                                           *settings.draw_debug_box_color)
+                                           *settings.draw_debug_box_color, True, 0.01)
 
     def draw_debug_origin(self, canvas: unrealsdk.UObject, player_controller: unrealsdk.UObject) -> None:
         if self.sm_component:

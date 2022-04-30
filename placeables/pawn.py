@@ -8,8 +8,6 @@ from .. import bl2tools
 from .. import canvasutils
 from .. import settings
 
-from Mods.PyImgui import pyd_imgui
-
 
 class AIPawnBalanceDefinition(AbstractPlaceable):
     def __init__(self, name: str, ai_pawn_balance: unrealsdk.UObject, ai_pawn: unrealsdk.UObject = None):
@@ -93,7 +91,7 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
                                            (self.ai_pawn.CollisionComponent.Bounds.BoxExtent.X,
                                             self.ai_pawn.CollisionComponent.Bounds.BoxExtent.Y,
                                             self.ai_pawn.CollisionComponent.Bounds.BoxExtent.Z),
-                                           *settings.draw_debug_box_color)
+                                           *settings.draw_debug_box_color, True, 0.01)
 
     def draw_debug_origin(self, canvas, player_controller) -> None:
         if self.ai_pawn:

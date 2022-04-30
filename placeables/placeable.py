@@ -10,7 +10,7 @@ from .. import bl2tools
 from .. import canvasutils
 from .. import settings
 
-from ...PyImgui import pyd_imgui
+import imgui
 
 _material_instances: List[unrealsdk.UObject] = []
 _material_instances_filtered: List[unrealsdk.UObject] = []
@@ -218,10 +218,10 @@ class AbstractPlaceable(ABC):
 
     @abstractmethod
     def draw(self) -> None:
-        pyd_imgui.push_item_width(-1)
+        imgui.push_item_width(-1)
 
-        pyd_imgui.text("Location (X, Y, Z)")
-        dragged_loc = pyd_imgui.drag_float3("##Location", self.get_location(), max(1, settings.editor_grid_size))
+        imgui.text("Location (X, Y, Z)")
+        dragged_loc = imgui.drag_float3("##Location", *self.get_location(), max(1, settings.editor_grid_size))
         if dragged_loc[0]:
             self.set_location(dragged_loc[1])
             pc = bl2tools.get_player_controller()
@@ -229,38 +229,38 @@ class AbstractPlaceable(ABC):
                                                                 pc.Location.Y,
                                                                 pc.Location.Z],
                                                                dragged_loc[1]))
-        pyd_imgui.spacing()
+        imgui.spacing()
 
-        pyd_imgui.text("Scale")
-        dragged_scale = pyd_imgui.drag_float("##Scale", self.get_scale(), 0.01)
+        imgui.text("Scale")
+        dragged_scale = imgui.drag_float("##Scale", self.get_scale(), 0.01)
         if dragged_scale[0]:
             self.set_scale(dragged_scale[1])
 
-        pyd_imgui.text("Scale3D")
-        dragged_scale3d = pyd_imgui.drag_float3("##Scale3D", self.get_scale3d(), 0.01)
+        imgui.text("Scale3D")
+        dragged_scale3d = imgui.drag_float3("##Scale3D", *self.get_scale3d(), 0.01)
         if dragged_scale3d[0]:
             self.set_scale3d(dragged_scale3d[1])
 
-        pyd_imgui.separator()
+        imgui.separator()
 
-        pyd_imgui.text("Rotation (Pitch, Yaw, Roll)")
-        dragged_rotation = pyd_imgui.drag_int3("##Rotation (Pitch, Yaw, Roll)", self.get_rotation(), 100)
+        imgui.text("Rotation (Pitch, Yaw, Roll)")
+        dragged_rotation = imgui.drag_int3("##Rotation (Pitch, Yaw, Roll)", *self.get_rotation(), 100)
         if dragged_rotation[0]:
             self.set_rotation(dragged_rotation[1])
 
-        pyd_imgui.spacing()
+        imgui.spacing()
 
         ################################################################################################################
         # Begin Material Helper Window                                                                                 #
         ################################################################################################################
-        if pyd_imgui.button("Add Material"):
+        if imgui.button("Add Material"):
             self._material_window_open = True
             _material_instances.extend(unrealsdk.FindAll("MaterialInstanceConstant")[1:])
 
         if self._material_window_open:
             global _material_instances_filtered, _material_instances_filtered_names
-            pyd_imgui.begin("MaterialWindow")
-            b_filtered, self.material_filter = pyd_imgui.input_text("Filter Materials", self.material_filter, 24)
+            imgui.begin("MaterialWindow")
+            b_filtered, self.material_filter = imgui.input_text("Filter Materials", self.material_filter, 24)
             if b_filtered:
                 _material_instances_filtered = [x for x in _material_instances
                                                 if self.material_filter.lower()
@@ -268,26 +268,26 @@ class AbstractPlaceable(ABC):
                 _material_instances_filtered_names = [bl2tools.get_obj_path_name(x)
                                                       for x in _material_instances_filtered]
 
-            self.new_material_int = pyd_imgui.list_box("##Materials",
-                                                       self.new_material_int,
-                                                       _material_instances_filtered_names)[1]
+            self.new_material_int = imgui.listbox("##Materials",
+                                                  self.new_material_int,
+                                                  _material_instances_filtered_names)[1]
 
-            if pyd_imgui.button("Add Material"):
+            if imgui.button("Add Material"):
                 self.add_material(_material_instances_filtered[self.new_material_int])
-            if pyd_imgui.button("Remove Material"):
+            if imgui.button("Remove Material"):
                 self.remove_material(material=_material_instances_filtered[self.new_material_int])
-            if pyd_imgui.button("Close"):
+            if imgui.button("Close"):
                 self._material_window_open = False
                 _material_instances.clear()
                 _material_instances_filtered.clear()
-            pyd_imgui.end()
+            imgui.end()
         ################################################################################################################
-        pyd_imgui.same_line()
-        if pyd_imgui.button("Remove Material"):
+        imgui.same_line()
+        if imgui.button("Remove Material"):
             self.remove_material(index=self.material_int)
-        pyd_imgui.text("Materials")
-        self.material_int = pyd_imgui.list_box("##Materials",
-                                               self.material_int,
-                                               [bl2tools.get_obj_path_name(x) for x in self.get_materials()])[1]
+        imgui.text("Materials")
+        self.material_int = imgui.listbox("##Materials",
+                                          self.material_int,
+                                          [bl2tools.get_obj_path_name(x) for x in self.get_materials()])[1]
 
-        pyd_imgui.pop_item_width()
+        imgui.pop_item_width()
