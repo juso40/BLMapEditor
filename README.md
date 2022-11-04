@@ -23,11 +23,19 @@ Can be rebinded:
  - DEL to destroy the currently selected object
  - P to toggle the object preview on/off
 
+Cannot be rebinded:
+- Tabulator: cycle through the different quick edit modes (Place, Move, Scale, Rotate)
+- Left Click: In Place mode create a copy of the current object at the current position
+- Right Click: In Place mode stop editing/placing the current object | In other modes, reset axis to None/Global
+- ScrollWheel: Increase/Decrease the current attribute+axis
+- X|Y|Z: Toggle the axis to edit, example: Press X -> Scroll Wheel will only change X value for the current quick edit mode eg. Scale.
+- Shift: Exclude this axis, so you can edit axis X and Z at the same time by pressing Shift+Y
+
   
 ## Installation
 Download this mod from [here](https://github.com/juso40/BLMapEditor/archive/master.zip).   
 Extract all the files from the archive and move them into your games `Win32/Mods/` directory.  
-The files should have following structure:
+The files should have the following structure:
 ```
 └── Win32/
     └── Mods/

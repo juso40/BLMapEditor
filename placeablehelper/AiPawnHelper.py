@@ -46,7 +46,6 @@ class AiPawnHelper(PlaceableHelper):
             return True
 
     def restore_objects_defaults(self) -> None:
-        bl2tools.feedback("Reset", "Cannot Reset custom AiPawn!", 4)
         return
 
     def move_object(self) -> None:
@@ -91,21 +90,27 @@ class AiPawnHelper(PlaceableHelper):
 
     def post_render(self, pc: unrealsdk.UObject, offset: int) -> None:
         super().post_render(pc, offset)
-        x, y, z = canvasutils.rot_to_vec3d([pc.CalcViewRotation.Pitch,
-                                            pc.CalcViewRotation.Yaw,
-                                            pc.CalcViewRotation.Roll])
+        x, y, z = canvasutils.rot_to_vec3d(
+            [pc.CalcViewRotation.Pitch,
+             pc.CalcViewRotation.Yaw,
+             pc.CalcViewRotation.Roll]
+            )
         if settings.b_show_preview and self.curr_preview:
             _x, _y = canvasutils.euler_rotate_vector_2d(0, 1, pc.CalcViewRotation.Yaw)
             now = time()
             w = tan(radians(pc.ToHFOV(pc.GetFOVAngle()) / 2)) * 200
             _x *= (w - 80)
             _y *= (w - 80)
-            self.curr_preview.set_preview_location((pc.Location.X + 200 * x - _x,
-                                                    pc.Location.Y + 200 * y - _y,
-                                                    pc.Location.Z + 200 * z))
-            self.curr_preview.add_rotation((0,
-                                            int((canvasutils.u_rotation_180 / 2.5) * (now - self.delta_time)),
-                                            0))
+            self.curr_preview.set_preview_location(
+                (pc.Location.X + 200 * x - _x,
+                 pc.Location.Y + 200 * y - _y,
+                 pc.Location.Z + 200 * z)
+                )
+            self.curr_preview.add_rotation(
+                (0,
+                 int((canvasutils.u_rotation_180 / 2.5) * (now - self.delta_time)),
+                 0)
+                )
             self.delta_time = now
 
         if self.curr_obj:
@@ -114,7 +119,8 @@ class AiPawnHelper(PlaceableHelper):
                 self.curr_obj.set_location(
                     (canvasutils.round_to_multiple(pc.Location.X + offset * x, settings.editor_grid_size),
                      canvasutils.round_to_multiple(pc.Location.Y + offset * y, settings.editor_grid_size),
-                     canvasutils.round_to_multiple(pc.Location.Z + offset * z, settings.editor_grid_size)))
+                     canvasutils.round_to_multiple(pc.Location.Z + offset * z, settings.editor_grid_size))
+                )
         else:
             # Now let us highlight the currently selected object (does not need to be the moved object!)
             if self._cached_objects_for_filter:
@@ -127,10 +133,13 @@ class AiPawnHelper(PlaceableHelper):
         if mapname == "menumap" or mapname == "none" or mapname == "":
             return
 
-        self.objects_by_filter["Create"].extend([
-            placeables.AIPawnBalanceDefinition(x.PlayThroughs[0].DisplayName if x.PlayThroughs[0].DisplayName else
-                                               bl2tools.get_obj_path_name(x).split(".")[-1], x)
-            for x in unrealsdk.FindAll("AIPawnBalanceDefinition")[1:]]
+        self.objects_by_filter["Create"].extend(
+            [
+                placeables.AIPawnBalanceDefinition(
+                    x.PlayThroughs[0].DisplayName if x.PlayThroughs[0].DisplayName else
+                    bl2tools.get_obj_path_name(x).split(".")[-1], x
+                    )
+                for x in unrealsdk.FindAll("AIPawnBalanceDefinition")[1:]]
         )
 
         self.objects_by_filter["Create"].sort(key=lambda obj: obj.name)

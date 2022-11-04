@@ -10,6 +10,44 @@ from .. import bl2tools
 from .. import settings
 
 
+def _initialize_vending_machine(iobject: unrealsdk.UObject) -> None:
+    vending_name = bl2tools.get_obj_path_name(iobject.InteractiveObjectDefinition).lower()
+    markup = unrealsdk.FindObject(
+        "AttributeInitializationDefinition",
+        "GD_Economy.VendingMachine.Init_MarkupCalc_P1"
+    )
+    iobject.CommerceMarkup.InitializationDefinition = markup
+    iobject.FeaturedItemCommerceMarkup.InitializationDefinition = markup
+    iobject.InventoryConfigurationName = "Inventory"
+    iobject.FeaturedItemConfigurationName = "FeaturedItem"
+    item_stage = unrealsdk.FindObject(
+        "AttributeInitializationDefinition",
+        "GD_Population_Shopping.Balance.Init_FeaturedItem_GameStage"
+    )
+    item_awesome = unrealsdk.FindObject(
+        "AttributeInitializationDefinition",
+        "GD_Population_Shopping.Balance.Init_FeaturedItem_AwesomeLevel"
+    )
+    iobject.FeaturedItemGameStage.InitializationDefinition = item_stage
+    iobject.FeaturedItemAwesomeLevel.InitializationDefinition = item_awesome
+    if "health" in vending_name:
+        iobject.ShopType = 2
+    elif "ammo" in vending_name:
+        iobject.ShopType = 1
+    elif "weapon" in vending_name:
+        iobject.ShopType = 0
+
+    iobject.ResetInventory()
+
+
+def _initialize_fast_travel_station(iobject: unrealsdk.UObject) -> None:
+    tp = iobject.TeleportDest
+    new_tp = unrealsdk.ConstructObject(Class=tp.Class, Template=tp, Outer=tp.Outer)
+    new_tp.ObjectFlags.B |= 4
+    iobject.TeleportDest = new_tp
+    iobject.TeleportDest.UpdateExitPointLocations()
+    iobject.TeleportDest.UpdateExitPointHeights()
+
 
 class InteractiveObjectBalanceDefinition(AbstractPlaceable):
     def __init__(self, name: str, iobject_definition: unrealsdk.UObject, iobject: unrealsdk.UObject = None):
@@ -94,20 +132,24 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
 
     def draw_debug_box(self, player_controller: unrealsdk.UObject) -> None:
         if self.iobject:
-            player_controller.DrawDebugSphere(tuple(self.get_location()),
-                                              120, 1,
-                                              *settings.draw_debug_box_color, True, 0.01)
+            player_controller.DrawDebugSphere(
+                tuple(self.get_location()),
+                120, 1,
+                *settings.draw_debug_box_color, True, 0.01
+            )
 
     def draw_debug_origin(self, canvas: unrealsdk.UObject, player_controller: unrealsdk.UObject) -> None:
         if self.iobject:
-            screen_x, screen_y = canvasutils.world_to_screen(canvas, self.get_location(),
-                                                             [player_controller.CalcViewRotation.Pitch,
-                                                              player_controller.CalcViewRotation.Yaw,
-                                                              player_controller.CalcViewRotation.Roll],
-                                                             [player_controller.Location.X,
-                                                              player_controller.Location.Y,
-                                                              player_controller.Location.Z],
-                                                             player_controller.ToHFOV(player_controller.GetFOVAngle()))
+            screen_x, screen_y = canvasutils.world_to_screen(
+                canvas, self.get_location(),
+                [player_controller.CalcViewRotation.Pitch,
+                 player_controller.CalcViewRotation.Yaw,
+                 player_controller.CalcViewRotation.Roll],
+                [player_controller.Location.X,
+                 player_controller.Location.Y,
+                 player_controller.Location.Z],
+                player_controller.ToHFOV(player_controller.GetFOVAngle())
+            )
             canvasutils.draw_box(canvas, 5, 5, screen_x - 5, screen_y - 5, settings.draw_debug_origin_color)
 
     def instantiate(self) -> Tuple[AbstractPlaceable, List[AbstractPlaceable]]:
@@ -131,13 +173,17 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
             will_pop = unrealsdk.FindAll("WillowPopulationOpportunityPoint")[1:]
             pop = unrealsdk.FindAll("PopulationOpportunityPoint")[1:]
             regions = pop if len(pop) > len(will_pop) else will_pop
-            region_game_stage = max(pc.GetGameStageFromRegion(x.GameStageRegion)
-                                    for x in regions if x.GameStageRegion)
+            region_game_stage = max(
+                pc.GetGameStageFromRegion(x.GameStageRegion)
+                for x in regions if x.GameStageRegion
+            )
         else:
             region_game_stage = max(x.GetGameStage() for x in unrealsdk.FindAll("WillowPlayerPawn") if x.Arms)
 
         iobject.SetGameStage(region_game_stage)
         iobject.SetExpLevel(region_game_stage)
+
+        iobject.PostBeginPlay()
 
         if is_bal_def:
             x = self.io_definition.SelectGradeIndex(region_game_stage, 0)
@@ -146,29 +192,14 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
             iobject.InitializeFromDefinition(self.io_definition.DefaultInteractiveObject, False)
 
             if bl2tools.obj_is_in_class(iobject, "WillowVendingMachine"):
-                vending_name = bl2tools.get_obj_path_name(iobject.InteractiveObjectDefinition).lower()
-                markup = unrealsdk.FindObject("AttributeInitializationDefinition",
-                                              "GD_Economy.VendingMachine.Init_MarkupCalc_P1")
-                iobject.CommerceMarkup.InitializationDefinition = markup
-                iobject.FeaturedItemCommerceMarkup.InitializationDefinition = markup
-                iobject.InventoryConfigurationName = "Inventory"
-                iobject.FeaturedItemConfigurationName = "FeaturedItem"
-                item_stage = unrealsdk.FindObject("AttributeInitializationDefinition",
-                                                  "GD_Population_Shopping.Balance.Init_FeaturedItem_GameStage")
-                item_awesome = unrealsdk.FindObject("AttributeInitializationDefinition",
-                                                    "GD_Population_Shopping.Balance.Init_FeaturedItem_AwesomeLevel")
-                iobject.FeaturedItemGameStage.InitializationDefinition = item_stage
-                iobject.FeaturedItemAwesomeLevel.InitializationDefinition = item_awesome
-                if "health" in vending_name:
-                    iobject.ShopType = 2
-                elif "ammo" in vending_name:
-                    iobject.ShopType = 1
-                elif "weapon" in vending_name:
-                    iobject.ShopType = 0
-
-                iobject.ResetInventory()
+                _initialize_vending_machine(iobject)
         else:
             iobject.InitializeFromDefinition(self.io_definition, False)
+            if "TravelStation" in iobject.InteractiveObjectDefinition.Name:
+                iobject.Class = unrealsdk.FindClass("FastTravelStation")
+                unrealsdk.Log(iobject.PathName(iobject))
+                _initialize_fast_travel_station(iobject)
+                # This only ever produces WillowInteractiveObject, not TravelStation
 
         ret.b_dynamically_created = True
         return ret, [ret, ]
@@ -235,14 +266,16 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
 
         elif self.b_dynamically_created:
             create_me = saved_json.setdefault("Create", {}).setdefault("InteractiveObjectDefinition", [])
-            create_me.append({bl2tools.get_obj_path_name(self.io_definition): {"Location": self.get_location(),
-                                                                               "Rotation": self.get_rotation(),
-                                                                               "Scale": self.get_scale(),
-                                                                               "Scale3D": self.get_scale3d(),
-                                                                               "Materials":
-                                                                                   [bl2tools.get_obj_path_name(x)
-                                                                                    for x in self.get_materials()]
-                                                                               }})
+            create_me.append(
+                {bl2tools.get_obj_path_name(self.io_definition): {"Location": self.get_location(),
+                                                                  "Rotation": self.get_rotation(),
+                                                                  "Scale": self.get_scale(),
+                                                                  "Scale3D": self.get_scale3d(),
+                                                                  "Materials":
+                                                                      [bl2tools.get_obj_path_name(x)
+                                                                       for x in self.get_materials()]
+                                                                  }}
+            )
 
     def draw(self) -> None:
         super().draw()

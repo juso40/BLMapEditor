@@ -222,7 +222,7 @@ class SMCHelper(PlaceableHelper):
                         self.objects_by_filter["All Components"].append(new_instance)
                         break
 
-        for obj, attrs in map_data.get("Edit", {}).get("StaticMeshComponent", {}):
+        for obj, attrs in map_data.get("Edit", {}).get("StaticMeshComponent", {}).items():
             for placeable in self.objects_by_filter["All Components"]:
                 if placeable.holds_object(unrealsdk.FindObject("Object", obj)):
                     placeable: placeables.StaticMeshComponent

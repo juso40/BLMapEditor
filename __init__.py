@@ -4,8 +4,11 @@ from unrealsdk import *
 from . import bl2tools
 from . import editor
 from . import settings
+
+from ..ModMenu import EnabledSaveType, KeybindManager, ModTypes, SDKMod, SaveModSettings
+
+import imgui
 from .. import blimgui
-from ..ModMenu import EnabledSaveType, KeybindManager, ModTypes, SDKMod
 
 IMGUI_SHOW: bool = False
 
@@ -29,6 +32,7 @@ class MapEditor(SDKMod):
     Author = "Juso"
     SaveEnabledState = EnabledSaveType.NotSaved
 
+
     # ToDo: Add functionality back to some keybinds
     # Working from UI only will be too slow
     Keybinds = [KeybindManager.Keybind("Restore Object Defaults", "Backspace"),
@@ -38,7 +42,12 @@ class MapEditor(SDKMod):
                 KeybindManager.Keybind("Delete Obj", "Delete"),
                 KeybindManager.Keybind("TP my Pawn to me", "F5"),
                 KeybindManager.Keybind("Toggle Preview", "P"),
-                KeybindManager.Keybind("Toggle Editor Cursor", "Pos1", OnPress=_toggle)
+                KeybindManager.Keybind("Toggle Editor Cursor", "Pos1", OnPress=_toggle),
+                KeybindManager.Keybind("Cycle Editing Mode", "Tab", IsRebindable=False),
+                KeybindManager.Keybind("Stop Editing", "Escape", IsRebindable=False),
+                KeybindManager.Keybind("Axis X", "X", IsRebindable=False),
+                KeybindManager.Keybind("Axis Y", "Y", IsRebindable=False),
+                KeybindManager.Keybind("Axis Z", "Z", IsRebindable=False),
                 ]
 
     def __init__(self):

@@ -62,6 +62,8 @@ class StaticMeshComponent(AbstractPlaceable):
         self.b_default_attributes = False
 
     def get_rotation(self) -> List[int]:
+        if not self.sm_component:
+            return [0, 0, 0]
         return [self.sm_component.Rotation.Pitch, self.sm_component.Rotation.Yaw, self.sm_component.Rotation.Roll]
 
     def add_rotation(self, rotator: Union[List[int], Tuple[int, int, int]]) -> None:

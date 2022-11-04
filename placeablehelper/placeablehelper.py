@@ -51,7 +51,7 @@ class PlaceableHelper(ABC):
             self.curr_preview = None
         if self.curr_obj:
             self.curr_obj: placeables.AbstractPlaceable
-            self.move_object()  # this will toggle our self.curr_obj to None and handle saving the current attributes
+            self.stop_move()
 
     @abstractmethod
     def add_to_prefab(self) -> None:
@@ -102,6 +102,14 @@ class PlaceableHelper(ABC):
         """
         pass
 
+    def stop_move(self) -> None:
+        if self.curr_obj:
+            self.curr_obj: placeables.AbstractPlaceable
+            if self.curr_obj.b_dynamically_created:
+                self.delete_object()
+            else:
+                self.restore_objects_defaults()
+
     def delete_object(self) -> None:
         """
         Delete the current object.
@@ -117,7 +125,8 @@ class PlaceableHelper(ABC):
                         pass
 
             self.curr_obj = None
-            self.object_index = -1
+            if self.curr_filter != "Create":  # In create mode we can stay at our index
+                self.object_index = -1
         except ValueError as e:
             pass  # add to log
         finally:
@@ -136,7 +145,7 @@ class PlaceableHelper(ABC):
     def calculate_preview(self) -> None:
         if self.curr_preview:
             self.curr_preview.destroy()
-        if self.curr_filter == "Create" and settings.b_show_preview:
+        if settings.b_show_preview:
             self.curr_preview = self._cached_objects_for_filter[self.object_index].get_preview()
         else:
             self.curr_preview = None
@@ -202,10 +211,12 @@ class PlaceableHelper(ABC):
         if imgui.button("Delete Object"):
             self.delete_object()
 
-        list_selected = imgui.listbox(f"##{self.curr_filter}",
-                                      self.object_index,
-                                      self.get_names_for_filter(),
-                                      32)
+        list_selected = imgui.listbox(
+            f"##{self.curr_filter}",
+            self.object_index,
+            self.get_names_for_filter(),
+            32
+            )
         if list_selected[0]:
             self.object_index = list_selected[1]
             self.calculate_preview()
