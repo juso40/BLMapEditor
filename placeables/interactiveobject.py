@@ -1,20 +1,16 @@
-from typing import Tuple, List, Union, cast
+from typing import List, Tuple, Union, cast
 
-import unrealsdk
-from unrealsdk import *
+import unrealsdk  # type: ignore
 
-from .placeable import AbstractPlaceable
-
-from .. import canvasutils
 from .. import bl2tools
-from .. import settings
+from .placeable import AbstractPlaceable
 
 
 def _initialize_vending_machine(iobject: unrealsdk.UObject) -> None:
     vending_name = bl2tools.get_obj_path_name(iobject.InteractiveObjectDefinition).lower()
     markup = unrealsdk.FindObject(
         "AttributeInitializationDefinition",
-        "GD_Economy.VendingMachine.Init_MarkupCalc_P1"
+        "GD_Economy.VendingMachine.Init_MarkupCalc_P1",
     )
     iobject.CommerceMarkup.InitializationDefinition = markup
     iobject.FeaturedItemCommerceMarkup.InitializationDefinition = markup
@@ -22,11 +18,11 @@ def _initialize_vending_machine(iobject: unrealsdk.UObject) -> None:
     iobject.FeaturedItemConfigurationName = "FeaturedItem"
     item_stage = unrealsdk.FindObject(
         "AttributeInitializationDefinition",
-        "GD_Population_Shopping.Balance.Init_FeaturedItem_GameStage"
+        "GD_Population_Shopping.Balance.Init_FeaturedItem_GameStage",
     )
     item_awesome = unrealsdk.FindObject(
         "AttributeInitializationDefinition",
-        "GD_Population_Shopping.Balance.Init_FeaturedItem_AwesomeLevel"
+        "GD_Population_Shopping.Balance.Init_FeaturedItem_AwesomeLevel",
     )
     iobject.FeaturedItemGameStage.InitializationDefinition = item_stage
     iobject.FeaturedItemAwesomeLevel.InitializationDefinition = item_awesome
@@ -50,24 +46,24 @@ def _initialize_fast_travel_station(iobject: unrealsdk.UObject) -> None:
 
 
 class InteractiveObjectBalanceDefinition(AbstractPlaceable):
-    def __init__(self, name: str, iobject_definition: unrealsdk.UObject, iobject: unrealsdk.UObject = None):
+    def __init__(self, name: str, iobject_definition: unrealsdk.UObject, iobject: unrealsdk.UObject = None) -> None:
         super().__init__(name, "InteractiveObjectDefinition")
         self.io_definition: unrealsdk.UObject = iobject_definition
         self.iobject: unrealsdk.UObject = iobject
         self.io_name: str = ""
+        self.uobject_path_name: str = bl2tools.get_obj_path_name(self.io_definition)
 
     def get_materials(self) -> List[unrealsdk.UObject]:
         if self.iobject and self.iobject.ObjectMesh:
-            return [x for x in self.iobject.ObjectMesh.Materials]
-        else:
-            return []
+            return [x for x in self.iobject.ObjectMesh.Materials]  # noqa: C416
+        return []
 
     def set_materials(self, materials: List[unrealsdk.UObject]) -> None:
         # because chests and some other IO generate Materials on spawning them, its very likely that the exported
         # list of materials wont work, just to be safe, ignore all kind of materials for InteractiveObjects
         # untill i find a better fix
         return
-        if self.iobject and self.iobject.ObjectMesh and materials is not None:
+        if self.iobject and self.iobject.ObjectMesh and materials:
             self.iobject.ObjectMesh.Materials = materials
 
     def add_material(self, material: unrealsdk.UObject) -> None:
@@ -106,9 +102,7 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
     def get_rotation(self) -> List[int]:
         if not self.iobject:
             return [0, 0, 0]
-        return [self.iobject.Rotation.Pitch,
-                self.iobject.Rotation.Yaw,
-                self.iobject.Rotation.Roll]
+        return [self.iobject.Rotation.Pitch, self.iobject.Rotation.Yaw, self.iobject.Rotation.Roll]
 
     def add_rotation(self, rotator: Union[List[int], Tuple[int, int, int]]) -> None:
         if self.iobject:
@@ -126,33 +120,13 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
     def get_location(self) -> List[float]:
         if not self.iobject:
             return [0, 0, 0]
-        return [self.iobject.Location.X,
-                self.iobject.Location.Y,
-                self.iobject.Location.Z]
+        return [self.iobject.Location.X, self.iobject.Location.Y, self.iobject.Location.Z]
 
-    def draw_debug_box(self, player_controller: unrealsdk.UObject) -> None:
-        if self.iobject:
-            player_controller.DrawDebugSphere(
-                tuple(self.get_location()),
-                120, 1,
-                *settings.draw_debug_box_color, True, 0.01
-            )
+    def get_bounding_box(self) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+        x, y, z = self.get_location()
+        return (x, y, z), (250, 250, 250)
 
-    def draw_debug_origin(self, canvas: unrealsdk.UObject, player_controller: unrealsdk.UObject) -> None:
-        if self.iobject:
-            screen_x, screen_y = canvasutils.world_to_screen(
-                canvas, self.get_location(),
-                [player_controller.CalcViewRotation.Pitch,
-                 player_controller.CalcViewRotation.Yaw,
-                 player_controller.CalcViewRotation.Roll],
-                [player_controller.Location.X,
-                 player_controller.Location.Y,
-                 player_controller.Location.Z],
-                player_controller.ToHFOV(player_controller.GetFOVAngle())
-            )
-            canvasutils.draw_box(canvas, 5, 5, screen_x - 5, screen_y - 5, settings.draw_debug_origin_color)
-
-    def instantiate(self) -> Tuple[AbstractPlaceable, List[AbstractPlaceable]]:
+    def instantiate(self) -> Tuple["InteractiveObjectBalanceDefinition", List["InteractiveObjectBalanceDefinition"]]:
         pc = bl2tools.get_player_controller()
         _loc = (pc.Location.X, pc.Location.Y, pc.Location.Z)
         pop_master = unrealsdk.FindAll("WillowPopulationMaster")[-1]
@@ -160,11 +134,19 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
         is_bal_def = bl2tools.obj_is_in_class(self.io_definition, "InteractiveObjectBalanceDefinition")
         if is_bal_def:
             iobject = pop_master.SpawnPopulationControlledActor(
-                self.io_definition.DefaultInteractiveObject.InteractiveObjectClass, None, "", _loc, (0, 0, 0)
+                self.io_definition.DefaultInteractiveObject.InteractiveObjectClass,
+                None,
+                "",
+                _loc,
+                (0, 0, 0),
             )
         else:
             iobject = pop_master.SpawnPopulationControlledActor(
-                self.io_definition.InteractiveObjectClass, None, "", _loc, (0, 0, 0)
+                self.io_definition.InteractiveObjectClass,
+                None,
+                "",
+                _loc,
+                (0, 0, 0),
             )
 
         ret = InteractiveObjectBalanceDefinition(self.name, self.io_definition, iobject)
@@ -173,10 +155,7 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
             will_pop = unrealsdk.FindAll("WillowPopulationOpportunityPoint")[1:]
             pop = unrealsdk.FindAll("PopulationOpportunityPoint")[1:]
             regions = pop if len(pop) > len(will_pop) else will_pop
-            region_game_stage = max(
-                pc.GetGameStageFromRegion(x.GameStageRegion)
-                for x in regions if x.GameStageRegion
-            )
+            region_game_stage = max(pc.GetGameStageFromRegion(x.GameStageRegion) for x in regions if x.GameStageRegion)
         else:
             region_game_stage = max(x.GetGameStage() for x in unrealsdk.FindAll("WillowPlayerPawn") if x.Arms)
 
@@ -202,9 +181,11 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
                 # This only ever produces WillowInteractiveObject, not TravelStation
 
         ret.b_dynamically_created = True
-        return ret, [ret, ]
+        return ret, [
+            ret,
+        ]
 
-    def get_preview(self) -> AbstractPlaceable:
+    def get_preview(self) -> "InteractiveObjectBalanceDefinition":
         ret = cast(InteractiveObjectBalanceDefinition, self.instantiate()[0])
         ret.set_scale(0.2)
         return ret
@@ -215,7 +196,7 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
     def holds_object(self, uobject: unrealsdk.UObject) -> bool:
         return self.io_definition is uobject or self.iobject is uobject
 
-    def destroy(self) -> List[AbstractPlaceable]:
+    def destroy(self) -> List["InteractiveObjectBalanceDefinition"]:
         if not self.iobject:
             raise ValueError("Cannot destroy not instantiated Object!")
 
@@ -225,7 +206,7 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
         self.set_location((-9999999, -9999999, -9999999))  # let's just move the pawn out of our sight
         self.set_scale(0)
         self.is_destroyed = True
-        return [self, ]
+        return [self]
 
     def store_default_values(self, default_dict: dict) -> None:
         if self.iobject and bl2tools.get_obj_path_name(self.iobject) not in default_dict:
@@ -234,7 +215,7 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
                 "Rotation": list(self.get_rotation()),
                 "Scale": self.get_scale(),
                 "Scale3D": self.get_scale3d(),
-                "Materials": [bl2tools.get_obj_path_name(x) for x in self.get_materials()]
+                "Materials": [bl2tools.get_obj_path_name(x) for x in self.get_materials()],
             }
 
     def restore_default_values(self, default_dict: dict) -> None:
@@ -250,16 +231,21 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
     def save_to_json(self, saved_json: dict) -> None:
         if not self.b_dynamically_created and self.b_default_attributes and not self.is_destroyed:
             return
-        elif not self.b_dynamically_created and not self.b_default_attributes and not self.is_destroyed:
+
+        cleaned_tags: List[str] = [x.strip() for x in self.tags if x.strip()]
+
+        if not self.b_dynamically_created and not self.b_default_attributes and not self.is_destroyed:
             smc_list = saved_json.setdefault("Edit", {}).setdefault("InteractiveObjectDefinition", {})
-            smc_list[bl2tools.get_obj_path_name(self.iobject)] = {"Location": self.get_location(),
-                                                                  "Rotation": self.get_rotation(),
-                                                                  "Scale": self.get_scale(),
-                                                                  "Scale3D": self.get_scale3d(),
-                                                                  "Materials":
-                                                                      [bl2tools.get_obj_path_name(x)
-                                                                       for x in self.get_materials()]
-                                                                  }
+            smc_list[bl2tools.get_obj_path_name(self.iobject)] = {
+                "Rename": self.rename,
+                "Tags": cleaned_tags,
+                "Metadata": self.metadata,
+                "Location": self.get_location(),
+                "Rotation": self.get_rotation(),
+                "Scale": self.get_scale(),
+                "Scale3D": self.get_scale3d(),
+                "Materials": [bl2tools.get_obj_path_name(x) for x in self.get_materials()],
+            }
         elif not self.b_dynamically_created and self.is_destroyed:
             smc_list = saved_json.setdefault("Destroy", {}).setdefault("InteractiveObjectDefinition", [])
             smc_list.append(self.io_name)
@@ -267,15 +253,16 @@ class InteractiveObjectBalanceDefinition(AbstractPlaceable):
         elif self.b_dynamically_created:
             create_me = saved_json.setdefault("Create", {}).setdefault("InteractiveObjectDefinition", [])
             create_me.append(
-                {bl2tools.get_obj_path_name(self.io_definition): {"Location": self.get_location(),
-                                                                  "Rotation": self.get_rotation(),
-                                                                  "Scale": self.get_scale(),
-                                                                  "Scale3D": self.get_scale3d(),
-                                                                  "Materials":
-                                                                      [bl2tools.get_obj_path_name(x)
-                                                                       for x in self.get_materials()]
-                                                                  }}
+                {
+                    self.uobject_path_name: {
+                        "Rename": self.rename,
+                        "Tags": cleaned_tags,
+                        "Metadata": self.metadata,
+                        "Location": self.get_location(),
+                        "Rotation": self.get_rotation(),
+                        "Scale": self.get_scale(),
+                        "Scale3D": self.get_scale3d(),
+                        "Materials": [bl2tools.get_obj_path_name(x) for x in self.get_materials()],
+                    },
+                },
             )
-
-    def draw(self) -> None:
-        super().draw()

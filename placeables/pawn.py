@@ -1,23 +1,22 @@
-from typing import List, Tuple, cast, Union
+from typing import List, Tuple, Union, cast
 
-import unrealsdk
-from unrealsdk import *
+import unrealsdk  # type: ignore
 
-from .placeable import AbstractPlaceable
 from .. import bl2tools
-from .. import canvasutils
-from .. import settings
+from .placeable import AbstractPlaceable
 
 
 class AIPawnBalanceDefinition(AbstractPlaceable):
-    def __init__(self, name: str, ai_pawn_balance: unrealsdk.UObject, ai_pawn: unrealsdk.UObject = None):
+    def __init__(self, name: str, ai_pawn_balance: unrealsdk.UObject, ai_pawn: unrealsdk.UObject = None) -> None:
         super().__init__(name, "AIPawnBalanceDefinition")
         self.ai_pawn_balance: unrealsdk.UObject = ai_pawn_balance
         self.ai_pawn: unrealsdk.UObject = ai_pawn
+        self.uobject_path_name: str = bl2tools.get_obj_path_name(self.ai_pawn_balance)
 
     def get_materials(self) -> List[unrealsdk.UObject]:
         if self.ai_pawn and self.ai_pawn.Mesh:
-            return [x for x in self.ai_pawn.Mesh.Materials]
+            return [x for x in self.ai_pawn.Mesh.Materials]  # noqa: C416
+        return []
 
     def set_materials(self, materials: List[unrealsdk.UObject]) -> None:
         if self.ai_pawn and self.ai_pawn.Mesh and materials is not None:
@@ -60,9 +59,7 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
     def get_rotation(self) -> List[int]:
         if not self.ai_pawn:
             return [0, 0, 0]
-        return [self.ai_pawn.Mesh.Rotation.Pitch,
-                self.ai_pawn.Mesh.Rotation.Yaw,
-                self.ai_pawn.Mesh.Rotation.Roll]
+        return [self.ai_pawn.Mesh.Rotation.Pitch, self.ai_pawn.Mesh.Rotation.Yaw, self.ai_pawn.Mesh.Rotation.Roll]
 
     def add_rotation(self, rotator: Union[List[int], Tuple[int, int, int]]) -> None:
         if self.ai_pawn:
@@ -79,48 +76,38 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
     def get_location(self) -> List[float]:
         if not self.ai_pawn:
             return [0, 0, 0]
-        return [self.ai_pawn.Location.X,
-                self.ai_pawn.Location.Y,
-                self.ai_pawn.Location.Z]
+        return [self.ai_pawn.Location.X, self.ai_pawn.Location.Y, self.ai_pawn.Location.Z]
 
-    def draw_debug_box(self, player_controller) -> None:
+    def get_bounding_box(self) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
         if self.ai_pawn:
-            player_controller.DrawDebugBox((self.ai_pawn.CollisionComponent.Bounds.Origin.X,
-                                            self.ai_pawn.CollisionComponent.Bounds.Origin.Y,
-                                            self.ai_pawn.CollisionComponent.Bounds.Origin.Z),
-                                           (self.ai_pawn.CollisionComponent.Bounds.BoxExtent.X,
-                                            self.ai_pawn.CollisionComponent.Bounds.BoxExtent.Y,
-                                            self.ai_pawn.CollisionComponent.Bounds.BoxExtent.Z),
-                                           *settings.draw_debug_box_color, True, 0.01)
+            cc = self.ai_pawn.CollisionComponent
+            return (
+                (cc.Bounds.Origin.X, cc.Bounds.Origin.Y, cc.Bounds.Origin.Z),
+                (cc.Bounds.BoxExtent.X, cc.Bounds.BoxExtent.Y, cc.Bounds.BoxExtent.Z),
+            )
+        return (0, 0, 0), (0, 0, 0)
 
-    def draw_debug_origin(self, canvas, player_controller) -> None:
-        if self.ai_pawn:
-            screen_x, screen_y = canvasutils.world_to_screen(canvas, self.get_location(),
-                                                             [player_controller.CalcViewRotation.Pitch,
-                                                              player_controller.CalcViewRotation.Yaw,
-                                                              player_controller.CalcViewRotation.Roll],
-                                                             [player_controller.Location.X,
-                                                              player_controller.Location.Y,
-                                                              player_controller.Location.Z],
-                                                             player_controller.ToHFOV(player_controller.GetFOVAngle()))
-            canvasutils.draw_box(canvas, 5, 5, screen_x - 5, screen_y - 5, settings.draw_debug_origin_color)
-
-    def instantiate(self) -> Tuple[AbstractPlaceable, List[AbstractPlaceable]]:
+    def instantiate(self) -> Tuple["AIPawnBalanceDefinition", List["AIPawnBalanceDefinition"]]:
         pc = bl2tools.get_player_controller()
         _loc = (pc.Location.X, pc.Location.Y, pc.Location.Z)
         pop_master = unrealsdk.FindAll("WillowPopulationMaster")[-1]
-        pawn = pop_master.SpawnPopulationControlledActor(self.ai_pawn_balance.AIPawnArchetype.Class,
-                                                         None, "", _loc, (0, 0, 0),
-                                                         self.ai_pawn_balance.AIPawnArchetype,
-                                                         False, False)
+        pawn = pop_master.SpawnPopulationControlledActor(
+            self.ai_pawn_balance.AIPawnArchetype.Class,
+            None,
+            "",
+            _loc,
+            (0, 0, 0),
+            self.ai_pawn_balance.AIPawnArchetype,
+            False,
+            False,
+        )
         ret = AIPawnBalanceDefinition(self.name, self.ai_pawn_balance, pawn)
 
         if pc.GetCurrentPlaythrough() != 2:
             will_pop = unrealsdk.FindAll("WillowPopulationOpportunityPoint")[1:]
             pop = unrealsdk.FindAll("PopulationOpportunityPoint")[1:]
             regions = pop if len(pop) > len(will_pop) else will_pop
-            region_game_stage = max(pc.GetGameStageFromRegion(x.GameStageRegion)
-                                    for x in regions if x.GameStageRegion)
+            region_game_stage = max(pc.GetGameStageFromRegion(x.GameStageRegion) for x in regions if x.GameStageRegion)
         else:
             region_game_stage = max(x.GetGameStage() for x in unrealsdk.FindAll("WillowPlayerPawn") if x.Arms)
         # PopulationFactoryBalancedAIPawn 105-120:
@@ -136,10 +123,13 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
 
         ai = pawn.MyWillowMind.GetAIDefinition()
         ai.TargetSearchRadius = 12000
+        self.b_dynamically_created = True
 
-        return ret, [ret, ]
+        return ret, [
+            ret,
+        ]
 
-    def get_preview(self) -> AbstractPlaceable:
+    def get_preview(self) -> "AIPawnBalanceDefinition":
         ret = cast(AIPawnBalanceDefinition, self.instantiate()[0])
         ret.set_scale(1 / (ret.ai_pawn.Mesh.SkeletalMesh.Bounds.SphereRadius / 60))
         return ret
@@ -150,7 +140,7 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
     def holds_object(self, uobject: unrealsdk.UObject) -> bool:
         return self.ai_pawn_balance is uobject or self.ai_pawn is uobject
 
-    def destroy(self) -> List[AbstractPlaceable]:
+    def destroy(self) -> List["AIPawnBalanceDefinition"]:
         if not self.ai_pawn:
             raise ValueError("Cannot destroy not instantiated Object!")
 
@@ -158,7 +148,9 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
         self.ai_pawn.Destroyed()
         self.set_scale(0)
         self.is_destroyed = True
-        return [self, ]
+        return [
+            self,
+        ]
 
     def store_default_values(self, default_dict: dict) -> None:
         pass
@@ -167,15 +159,21 @@ class AIPawnBalanceDefinition(AbstractPlaceable):
         pass
 
     def save_to_json(self, saved_json: dict) -> None:
-        pawns = saved_json.setdefault("Create", {}).setdefault("AIPawnBalanceDefinition", [])
-        pawns.append({bl2tools.get_obj_path_name(self.ai_pawn_balance): {"Location": self.get_location(),
-                                                                         "Rotation": self.get_rotation(),
-                                                                         "Scale": self.get_scale(),
-                                                                         "Scale3D": self.get_scale3d(),
-                                                                         "Materials":
-                                                                             [bl2tools.get_obj_path_name(x)
-                                                                              for x in self.get_materials()]
-                                                                         }})
+        cleaned_tags: List[str] = [x.strip() for x in self.tags if x.strip()]
 
-    def draw(self) -> None:
-        super().draw()
+        pawns = saved_json.setdefault("Create", {}).setdefault("AIPawnBalanceDefinition", [])
+        pawns.append(
+            {
+                self.uobject_path_name: {
+                    "Rename": self.rename,
+                    "Tags": cleaned_tags,
+                    "Metadata": self.metadata,
+                    "Location": self.get_location(),
+                    "Rotation": self.get_rotation(),
+                    "Scale": self.get_scale(),
+                    "Scale3D": self.get_scale3d(),
+                    "Materials": [bl2tools.get_obj_path_name(x) for x in self.get_materials()],
+                },
+            },
+        )
+

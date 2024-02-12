@@ -22,8 +22,8 @@ class LightComponentHelper(PlaceableHelper):
     def __init__(self):
         super().__init__(
             name="Edit Light",
-            supported_filters=["All Components", "Edited", "Create"]
-            )
+            supported_filters=["All Instances", "Edited", "Create"]
+        )
 
         self.edited_default: dict = {}  # used to restore default attrs
 
@@ -62,47 +62,11 @@ class LightComponentHelper(PlaceableHelper):
                 [pc.CalcViewRotation.Pitch,
                  pc.CalcViewRotation.Yaw,
                  pc.CalcViewRotation.Roll]
-                )
+            )
 
             pc.Location = (x - 200 * _x, y - 200 * _y, z - 200 * _z)
 
             return True
-
-    def restore_objects_defaults(self) -> None:
-        if self.curr_filter in ("Create", "Prefab BP"):
-            bl2tools.feedback("Reset", "Cannot Reset non existing objects!", 4)
-            return
-
-        if self.curr_obj:
-            self.curr_obj.restore_default_values(self.edited_default)
-            if not self.curr_obj.b_dynamically_created:
-                self.objects_by_filter["Edited"].pop(self.objects_by_filter["Edited"].index(self.curr_obj))
-                self.object_index %= len(self._cached_objects_for_filter)
-            self.curr_obj = None
-
-            bl2tools.feedback("Restored", "Successfully restored the objects defaults!", 4)
-        self.is_cache_dirty = True
-
-    def move_object(self) -> None:
-        if self.curr_obj:
-            self.curr_obj = None
-        else:
-            if self.curr_filter not in ("Create", "Prefab BP"):
-                self.curr_obj = self._cached_objects_for_filter[self.object_index]
-                # add the default values to the default dict to revert changes if needed
-                self.curr_obj.store_default_values(self.edited_default)
-                if self.curr_filter != "Prefab Instances" and self.curr_obj not in self.objects_by_filter["Edited"]:
-                    self.objects_by_filter["Edited"].append(self.curr_obj)
-            elif self.curr_filter in ("Create", "Prefab BP"):
-                # create a new instance from our Blueprint object
-                new_instance, created_lcs = self._cached_objects_for_filter[self.object_index].instantiate()
-                for smc in created_lcs:
-                    self.objects_by_filter["Edited"].append(smc)
-                    self.objects_by_filter["All Components"].append(smc)
-                self.curr_obj = new_instance  # let's start editing this new object
-                if self.curr_filter == "Prefab BP":
-                    self.objects_by_filter["Prefab Instances"].append(new_instance)
-        self.is_cache_dirty = True
 
     def delete_object(self) -> None:
         if self.curr_obj:
@@ -110,34 +74,13 @@ class LightComponentHelper(PlaceableHelper):
                 self.deleted.append(self.curr_obj)
             super(LightComponentHelper, self).delete_object()
 
-    def copy(self) -> None:
-        super().copy()
-
-    def paste(self) -> None:
-        self.clipboard: placeables.AbstractPlaceable
-        if self.clipboard and not self.clipboard.is_destroyed:
-            pasted, created = self.clipboard.instantiate()
-            pasted.set_scale(self.clipboard.get_scale())
-            pasted.set_rotation(self.clipboard.get_rotation())
-            pasted.set_scale3d(self.clipboard.get_scale3d())
-            pasted.set_materials(self.clipboard.get_materials())
-            pasted.set_location(self.clipboard.get_location())
-            self.objects_by_filter["Edited"].extend(created)
-            self.objects_by_filter["All Components"].extend(created)
-            if not self.curr_obj:
-                self.curr_obj = pasted
-        self.is_cache_dirty = True
-
-    def calculate_preview(self) -> None:
-        super(LightComponentHelper, self).calculate_preview()
-
     def post_render(self, pc: unrealsdk.UObject, offset: int) -> None:
         super().post_render(pc, offset)
         x, y, z = canvasutils.rot_to_vec3d(
             [pc.CalcViewRotation.Pitch,
              pc.CalcViewRotation.Yaw,
              pc.CalcViewRotation.Roll]
-            )
+        )
         if settings.b_show_preview and self.curr_preview:
             _x, _y = canvasutils.euler_rotate_vector_2d(0, 1, pc.CalcViewRotation.Yaw)
             now = time()
@@ -148,12 +91,12 @@ class LightComponentHelper(PlaceableHelper):
                 (pc.Location.X + 200 * x - _x,
                  pc.Location.Y + 200 * y - _y,
                  pc.Location.Z + 200 * z)
-                )
+            )
             self.curr_preview.add_rotation(
                 (0,
                  int((canvasutils.u_rotation_180 / 2.5) * (now - self.delta_time)),
                  0)
-                )
+            )
             self.delta_time = now
 
         # highlight the currently selected prefab meshes
@@ -184,27 +127,27 @@ class LightComponentHelper(PlaceableHelper):
             return
         """
         for x in unrealsdk.FindAll("StaticLightCollectionActor"):
-            self.objects_by_filter["All Components"].extend(
+            self.objects_by_filter["All Instances"].extend(
                 [
                     placeables.StaticMeshComponent(
                         bl2tools.get_obj_path_name(y.StaticMesh).split(".", 1)[-1],
                         y.StaticMesh, y
                         ) for y in x.AllComponents]
             )
-        self.objects_by_filter["All Components"].sort(key=lambda obj: obj.name)
+        self.objects_by_filter["All Instances"].sort(key=lambda obj: obj.name)
         """
         self.objects_by_filter["Create"].extend(
-               [
-                   placeables.LightComponent("SpotLightComponent", "SpotLightComponent"),
-                   placeables.LightComponent("PointLightComponent", "PointLightComponent"),
-               ]
-            )
+            [
+                placeables.LightComponent("SpotLightComponent", "SpotLightComponent"),
+                placeables.LightComponent("PointLightComponent", "PointLightComponent"),
+            ]
+        )
 
         self.objects_by_filter["Create"].sort(key=lambda _x: _x.name)
 
     def load_map(self, map_data: dict) -> None:
         for to_destroy in map_data.get("Destroy", {}).get("Light", []):
-            for placeable in self.objects_by_filter["All Components"]:  # type: placeables.AbstractPlaceable
+            for placeable in self.objects_by_filter["All Instances"]:  # type: placeables.AbstractPlaceable
                 if placeable.holds_object(unrealsdk.FindObject("Object", to_destroy)):
                     self.deleted.append(placeable)
                     to_remove = placeable.destroy()
@@ -234,11 +177,11 @@ class LightComponentHelper(PlaceableHelper):
                         new_instance.set_materials(mats)
 
                         self.objects_by_filter["Edited"].append(new_instance)
-                        self.objects_by_filter["All Components"].append(new_instance)
+                        self.objects_by_filter["All Instances"].append(new_instance)
                         break
 
         for obj, attrs in map_data.get("Edit", {}).get("Light", {}):
-            for placeable in self.objects_by_filter["All Components"]:
+            for placeable in self.objects_by_filter["All Instances"]:
                 if placeable.holds_object(unrealsdk.FindObject("Object", obj)):
                     placeable: placeables.StaticMeshComponent
                     placeable.set_location(attrs.get("Location", (0, 0, 0)))
@@ -255,7 +198,7 @@ class LightComponentHelper(PlaceableHelper):
                     break
 
     def save_map(self, map_data: dict) -> None:
-        for placeable in self.objects_by_filter["All Components"]:
+        for placeable in self.objects_by_filter["All Instances"]:
             placeable.save_to_json(map_data)
 
         for deleted in self.deleted:

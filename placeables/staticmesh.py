@@ -1,25 +1,23 @@
-from typing import Tuple, List, Union
+from typing import List, Tuple, Union
 
-import unrealsdk
-from unrealsdk import *
+import unrealsdk  # type: ignore
 
-from .placeable import AbstractPlaceable
-
-from .. import canvasutils
 from .. import bl2tools
-from .. import settings
+from .placeable import AbstractPlaceable
 
 
 class StaticMeshComponent(AbstractPlaceable):
-    def __init__(self, name: str, static_mesh: unrealsdk.UObject, sm_component: unrealsdk.UObject = None):
+    def __init__(self, name: str, static_mesh: unrealsdk.UObject, sm_component: unrealsdk.UObject = None) -> None:
         super().__init__(name, "StaticMeshComponent")
         self.static_mesh: unrealsdk.UObject = static_mesh
         self.sm_component: unrealsdk.UObject = sm_component  # when destroyed, it will eventually get GC'ed,
         self.sm_component_name: str = ""  # ...but we may still need its name for saving it later to json
+        self.uobject_path_name: str = bl2tools.get_obj_path_name(self.static_mesh)
 
     def get_materials(self) -> List[unrealsdk.UObject]:
         if self.sm_component:
-            return [x for x in self.sm_component.Materials]
+            return [x for x in self.sm_component.Materials]  # noqa: C416
+        return []
 
     def set_materials(self, materials: List[unrealsdk.UObject]) -> None:
         if self.sm_component and materials is not None:
@@ -87,33 +85,22 @@ class StaticMeshComponent(AbstractPlaceable):
     def get_location(self) -> List[float]:
         if not self.sm_component:
             return [0, 0, 0]
-        return [self.sm_component.CachedParentToWorld.WPlane.X,
-                self.sm_component.CachedParentToWorld.WPlane.Y,
-                self.sm_component.CachedParentToWorld.WPlane.Z]
+        return [
+            self.sm_component.CachedParentToWorld.WPlane.X,
+            self.sm_component.CachedParentToWorld.WPlane.Y,
+            self.sm_component.CachedParentToWorld.WPlane.Z,
+        ]
 
-    def draw_debug_box(self, player_controller: unrealsdk.UObject) -> None:
+    def get_bounding_box(self) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
         if self.sm_component:
-            player_controller.DrawDebugBox((self.sm_component.Bounds.Origin.X,
-                                            self.sm_component.Bounds.Origin.Y,
-                                            self.sm_component.Bounds.Origin.Z),
-                                           (self.sm_component.Bounds.BoxExtent.X,
-                                            self.sm_component.Bounds.BoxExtent.Y,
-                                            self.sm_component.Bounds.BoxExtent.Z),
-                                           *settings.draw_debug_box_color, True, 0.01)
+            bounds = self.sm_component.Bounds
+            return (
+                (bounds.Origin.X, bounds.Origin.Y, bounds.Origin.Z),
+                (bounds.BoxExtent.X, bounds.BoxExtent.Y, bounds.BoxExtent.Z),
+            )
+        return (0, 0, 0), (0, 0, 0)
 
-    def draw_debug_origin(self, canvas: unrealsdk.UObject, player_controller: unrealsdk.UObject) -> None:
-        if self.sm_component:
-            screen_x, screen_y = canvasutils.world_to_screen(canvas, self.get_location(),
-                                                             [player_controller.CalcViewRotation.Pitch,
-                                                              player_controller.CalcViewRotation.Yaw,
-                                                              player_controller.CalcViewRotation.Roll],
-                                                             [player_controller.Location.X,
-                                                              player_controller.Location.Y,
-                                                              player_controller.Location.Z],
-                                                             player_controller.ToHFOV(player_controller.GetFOVAngle()))
-            canvasutils.draw_box(canvas, 5, 5, screen_x - 5, screen_y - 5, settings.draw_debug_origin_color)
-
-    def instantiate(self) -> Tuple[AbstractPlaceable, List[AbstractPlaceable]]:
+    def instantiate(self) -> Tuple["StaticMeshComponent", List["StaticMeshComponent"]]:
         new_smc = bl2tools.get_world_info().MyEmitterPool.GetFreeStaticMeshComponent(True)
         ret = StaticMeshComponent(self.name, self.static_mesh, new_smc)
         collection_actor = unrealsdk.FindAll("StaticMeshCollectionActor")[-1]
@@ -125,9 +112,11 @@ class StaticMeshComponent(AbstractPlaceable):
 
         ret.b_dynamically_created = True
 
-        return ret, [ret, ]
+        return ret, [
+            ret,
+        ]
 
-    def get_preview(self) -> AbstractPlaceable:
+    def get_preview(self) -> "StaticMeshComponent":
         new_smc = bl2tools.get_world_info().MyEmitterPool.GetFreeStaticMeshComponent(True)
         ret = StaticMeshComponent(self.name, self.static_mesh, new_smc)
 
@@ -145,15 +134,12 @@ class StaticMeshComponent(AbstractPlaceable):
     def holds_object(self, uobject: unrealsdk.UObject) -> bool:
         return self.sm_component is uobject or self.static_mesh is uobject
 
-    def destroy(self) -> List[AbstractPlaceable]:
+    def destroy(self) -> List["StaticMeshComponent"]:
         if self.sm_component is None:  # if we don't have a SMC we can't destroy it
-            raise ValueError("Cannot destroy not instantiated Object!")
-        # the sm_component may get GC'ed, but we need its name to save it later
-        if not self.b_dynamically_created:
-            self.sm_component_name = bl2tools.get_obj_path_name(self.sm_component)
+            raise ValueError("Cannot destroy non-instantiated Object!")
         self.sm_component.DetachFromAny()
         self.is_destroyed = True
-        return [self, ]
+        return [self]
 
     def store_default_values(self, default_dict: dict) -> None:
         if self.sm_component and bl2tools.get_obj_path_name(self.sm_component) not in default_dict:
@@ -162,9 +148,7 @@ class StaticMeshComponent(AbstractPlaceable):
                 "Rotation": self.get_rotation(),
                 "Scale": self.get_scale(),
                 "Scale3D": self.get_scale3d(),
-                "Materials":
-                    [bl2tools.get_obj_path_name(x)
-                     for x in self.get_materials()]
+                "Materials": [bl2tools.get_obj_path_name(x) for x in self.get_materials()],
             }
 
     def restore_default_values(self, default_dict: dict) -> None:
@@ -180,16 +164,21 @@ class StaticMeshComponent(AbstractPlaceable):
     def save_to_json(self, saved_json: dict) -> None:
         if not self.b_dynamically_created and self.b_default_attributes and not self.is_destroyed:
             return
-        elif not self.b_dynamically_created and not self.b_default_attributes and not self.is_destroyed:
+
+        cleaned_tags: List[str] = [x.strip() for x in self.tags if x.strip()]
+
+        if not self.b_dynamically_created and not self.b_default_attributes and not self.is_destroyed:
             smc_list = saved_json.setdefault("Edit", {}).setdefault("StaticMeshComponent", {})
-            smc_list[bl2tools.get_obj_path_name(self.sm_component)] = {"Location": self.get_location(),
-                                                                       "Rotation": self.get_rotation(),
-                                                                       "Scale": self.get_scale(),
-                                                                       "Scale3D": self.get_scale3d(),
-                                                                       "Materials":
-                                                                           [bl2tools.get_obj_path_name(x)
-                                                                            for x in self.get_materials()]
-                                                                       }
+            smc_list[bl2tools.get_obj_path_name(self.sm_component)] = {
+                "Rename": self.rename,
+                "Tags": cleaned_tags,
+                "Metadata": self.metadata,
+                "Location": self.get_location(),
+                "Rotation": self.get_rotation(),
+                "Scale": self.get_scale(),
+                "Scale3D": self.get_scale3d(),
+                "Materials": [bl2tools.get_obj_path_name(x) for x in self.get_materials()],
+            }
 
         elif not self.b_dynamically_created and self.is_destroyed:
             smc_list = saved_json.setdefault("Destroy", {}).setdefault("StaticMeshComponent", [])
@@ -197,14 +186,17 @@ class StaticMeshComponent(AbstractPlaceable):
 
         elif self.b_dynamically_created:
             smc_list = saved_json.setdefault("Create", {}).setdefault("StaticMesh", [])
-            smc_list.append({bl2tools.get_obj_path_name(self.static_mesh): {"Location": self.get_location(),
-                                                                            "Rotation": self.get_rotation(),
-                                                                            "Scale": self.get_scale(),
-                                                                            "Scale3D": self.get_scale3d(),
-                                                                            "Materials":
-                                                                                [bl2tools.get_obj_path_name(x)
-                                                                                 for x in self.get_materials()]
-                                                                            }})
-
-    def draw(self) -> None:
-        super().draw()
+            smc_list.append(
+                {
+                    self.uobject_path_name: {
+                        "Rename": self.rename,
+                        "Tags": cleaned_tags,
+                        "Metadata": self.metadata,
+                        "Location": self.get_location(),
+                        "Rotation": self.get_rotation(),
+                        "Scale": self.get_scale(),
+                        "Scale3D": self.get_scale3d(),
+                        "Materials": [bl2tools.get_obj_path_name(x) for x in self.get_materials()],
+                    },
+                },
+            )

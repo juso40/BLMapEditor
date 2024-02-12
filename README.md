@@ -8,7 +8,8 @@ If you want to go ahead and mess around with it, but don't expect all your creat
 of the editor. As I continue to add features to the editor I may need to rewrite the map loading/saving.  
 
 ## Dependencies
-This mod depends on [blimgui](https://bl-sdk.github.io/mods/blimgui/) to draw the Editor GUI.  
+This mod depends on [blimgui](https://bl-sdk.github.io/mods/blimgui/) and [coroutines](https://bl-sdk.github.io/mods/Coroutines/) to draw the Editor GUI 
+and on [uemath](https://bl-sdk.github.io/mods/UEMathLibrary/) to provide some math functions.
 
 ## Controls
 Most controls can be rebinded inside the `Modded Keybinds` menu ingame.
@@ -23,19 +24,11 @@ Can be rebinded:
  - DEL to destroy the currently selected object
  - P to toggle the object preview on/off
 
-Cannot be rebinded:
-- Tabulator: cycle through the different quick edit modes (Place, Move, Scale, Rotate)
-- Left Click: In Place mode create a copy of the current object at the current position
-- Right Click: In Place mode stop editing/placing the current object | In other modes, reset axis to None/Global
-- ScrollWheel: Increase/Decrease the current attribute+axis
-- X|Y|Z: Toggle the axis to edit, example: Press X -> Scroll Wheel will only change X value for the current quick edit mode eg. Scale.
-- Shift: Exclude this axis, so you can edit axis X and Z at the same time by pressing Shift+Y
-
   
 ## Installation
 Download this mod from [here](https://github.com/juso40/BLMapEditor/archive/master.zip).   
 Extract all the files from the archive and move them into your games `Win32/Mods/` directory.  
-The files should have the following structure:
+The files should have following structure:
 ```
 └── Win32/
     └── Mods/

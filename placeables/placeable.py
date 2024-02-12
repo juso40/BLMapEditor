@@ -1,35 +1,26 @@
-from __future__ import annotations
-
+import contextlib
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Union
 
-import unrealsdk
-from unrealsdk import *
-
-from .. import bl2tools
-from .. import canvasutils
-from .. import settings
-
-import imgui
-
-_material_instances: List[unrealsdk.UObject] = []
-_material_instances_filtered: List[unrealsdk.UObject] = []
-_material_instances_filtered_names: List[str] = []
+import unrealsdk  # type: ignore
 
 
 class AbstractPlaceable(ABC):
-
-    def __init__(self, name: str, uclass: str):
+    def __init__(self, name: str, uclass: str) -> None:
+        self.uobject_path_name: str = ""
         self.name: str = name
+        self.rename: str = ""
+        self.metadata: str = ""
+        self.tags: List[str] = []
         self.uclass: str = uclass
         self.b_dynamically_created: bool = False
         self.b_default_attributes: bool = True
-        self.material_int: int = -1
-        self.new_material_int: int = -1
-        self.material_filter: str = ""
         self.is_destroyed: bool = False
 
         self._material_window_open: bool = False
+
+    def __str__(self) -> str:
+        return f"{self.rename if self.rename else self.name} ({self.uclass})"
 
     @abstractmethod
     def get_materials(self) -> List[unrealsdk.UObject]:
@@ -39,6 +30,7 @@ class AbstractPlaceable(ABC):
     @abstractmethod
     def set_materials(self, materials: List[unrealsdk.UObject]) -> None:
         """Set the list of MaterialInstanceConstants for this object."""
+        pass
 
     def add_material(self, material: unrealsdk.UObject) -> None:
         """Add a single MaterialInstanceConstant."""
@@ -49,15 +41,11 @@ class AbstractPlaceable(ABC):
     def remove_material(self, material: unrealsdk.UObject = None, index: int = -1) -> None:
         materials = self.get_materials()
         if material:
-            try:
+            with contextlib.suppress(ValueError):
                 materials.remove(material)
-            except ValueError:
-                pass
         elif index > -1:
-            try:
+            with contextlib.suppress(IndexError):
                 materials.pop(index)
-            except IndexError:
-                pass
         self.set_materials(materials)
 
     @abstractmethod
@@ -90,6 +78,7 @@ class AbstractPlaceable(ABC):
     def get_scale3d(self) -> List[float]:
         pass
 
+    @abstractmethod
     def set_scale3d(self, scale3d: List[float]) -> None:
         pass
 
@@ -137,15 +126,15 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def draw_debug_box(self, player_controller: unrealsdk.UObject) -> None:
+    def get_bounding_box(self) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+        """
+        Get the bounding box of this object.
+        :return: origin, extent
+        """
         pass
 
     @abstractmethod
-    def draw_debug_origin(self, canvas: unrealsdk.UObject, player_controller: unrealsdk.UObject) -> None:
-        pass
-
-    @abstractmethod
-    def instantiate(self) -> Tuple[AbstractPlaceable, List[AbstractPlaceable]]:
+    def instantiate(self) -> Tuple["AbstractPlaceable", List["AbstractPlaceable"]]:
         """
         If this object holds only a BP for a Placeable Component use this method to instantiate a new object
         associated with the actual in-game components.
@@ -154,7 +143,7 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def get_preview(self) -> AbstractPlaceable:
+    def get_preview(self) -> "AbstractPlaceable":
         """
         Return aa previewable version this object. An object returned by this function should have its location
         only be changed using object.Translation
@@ -181,7 +170,7 @@ class AbstractPlaceable(ABC):
         pass
 
     @abstractmethod
-    def destroy(self) -> List[AbstractPlaceable]:
+    def destroy(self) -> List["AbstractPlaceable"]:
         """
         If the Object cannot be destroyed, raise an ValueError.
         :return: Returns a list of Placeables to be removed.
@@ -216,78 +205,3 @@ class AbstractPlaceable(ABC):
         """
         pass
 
-    @abstractmethod
-    def draw(self) -> None:
-        imgui.push_item_width(-1)
-
-        imgui.text("Location (X, Y, Z)")
-        dragged_loc = imgui.drag_float3("##Location", *self.get_location(), max(1, settings.editor_grid_size))
-        if dragged_loc[0]:
-            self.set_location(dragged_loc[1])
-            pc = bl2tools.get_player_controller()
-            pc.Rotation = tuple(canvasutils.rotate_to_location([pc.Location.X,
-                                                                pc.Location.Y,
-                                                                pc.Location.Z],
-                                                               dragged_loc[1]))
-        imgui.spacing()
-
-        imgui.text("Scale")
-        dragged_scale = imgui.drag_float("##Scale", self.get_scale(), 0.01)
-        if dragged_scale[0]:
-            self.set_scale(dragged_scale[1])
-
-        imgui.text("Scale3D")
-        dragged_scale3d = imgui.drag_float3("##Scale3D", *self.get_scale3d(), 0.01)
-        if dragged_scale3d[0]:
-            self.set_scale3d(dragged_scale3d[1])
-
-        imgui.separator()
-
-        imgui.text("Rotation (Pitch, Yaw, Roll)")
-        dragged_rotation = imgui.drag_int3("##Rotation (Pitch, Yaw, Roll)", *self.get_rotation(), 100)
-        if dragged_rotation[0]:
-            self.set_rotation(dragged_rotation[1])
-
-        imgui.spacing()
-
-        ################################################################################################################
-        # Begin Material Helper Window                                                                                 #
-        ################################################################################################################
-        if imgui.button("Add Material"):
-            self._material_window_open = True
-            _material_instances.extend(unrealsdk.FindAll("MaterialInstanceConstant")[1:])
-
-        if self._material_window_open:
-            global _material_instances_filtered, _material_instances_filtered_names
-            imgui.begin("MaterialWindow")
-            b_filtered, self.material_filter = imgui.input_text("Filter Materials", self.material_filter, 24)
-            if b_filtered:
-                _material_instances_filtered = [x for x in _material_instances
-                                                if self.material_filter.lower()
-                                                in bl2tools.get_obj_path_name(x).lower()]
-                _material_instances_filtered_names = [bl2tools.get_obj_path_name(x)
-                                                      for x in _material_instances_filtered]
-
-            self.new_material_int = imgui.listbox("##Materials",
-                                                  self.new_material_int,
-                                                  _material_instances_filtered_names)[1]
-
-            if imgui.button("Add Material"):
-                self.add_material(_material_instances_filtered[self.new_material_int])
-            if imgui.button("Remove Material"):
-                self.remove_material(material=_material_instances_filtered[self.new_material_int])
-            if imgui.button("Close"):
-                self._material_window_open = False
-                _material_instances.clear()
-                _material_instances_filtered.clear()
-            imgui.end()
-        ################################################################################################################
-        imgui.same_line()
-        if imgui.button("Remove Material"):
-            self.remove_material(index=self.material_int)
-        imgui.text("Materials")
-        self.material_int = imgui.listbox("##Materials",
-                                          self.material_int,
-                                          [bl2tools.get_obj_path_name(x) for x in self.get_materials()])[1]
-
-        imgui.pop_item_width()

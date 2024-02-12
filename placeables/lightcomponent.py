@@ -9,7 +9,6 @@ from .. import canvasutils
 from .. import bl2tools
 from .. import settings
 
-
 """
 Do not use!
 Still need to figure out how to instantiate a new light source.
@@ -100,23 +99,8 @@ class LightComponent(AbstractPlaceable):
                 (50,
                  50,
                  50),
-                *settings.draw_debug_box_color, True, 0.01
+                *settings.draw_debug_box_color.CurrentValue, True, 0.01
             )
-
-    def draw_debug_origin(self, canvas: unrealsdk.UObject, player_controller: unrealsdk.UObject) -> None:
-        return
-        if self.light_component:
-            screen_x, screen_y = canvasutils.world_to_screen(
-                canvas, self.get_location(),
-                [player_controller.CalcViewRotation.Pitch,
-                 player_controller.CalcViewRotation.Yaw,
-                 player_controller.CalcViewRotation.Roll],
-                [player_controller.Location.X,
-                 player_controller.Location.Y,
-                 player_controller.Location.Z],
-                player_controller.ToHFOV(player_controller.GetFOVAngle())
-            )
-            canvasutils.draw_box(canvas, 5, 5, screen_x - 5, screen_y - 5, settings.draw_debug_origin_color)
 
     def instantiate(self) -> Tuple[AbstractPlaceable, List[AbstractPlaceable]]:
         pc = bl2tools.get_player_controller()
