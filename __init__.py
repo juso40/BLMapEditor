@@ -21,7 +21,7 @@ def _toggle() -> None:
 
 class MapEditor(SDKMod):
     Name = "Map Editor"
-    Version = "1.7"
+    Version = "1.8"
     Types = ModTypes.Utility | ModTypes.Content
     Description = "Map Editor."
     Author = "Juso"
