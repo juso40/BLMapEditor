@@ -1,0 +1,17 @@
+[project]
+name = "blmapeditor"
+version = "0.1"
+authors = [{ name = "juso" }]
+description = """\
+Place, move, delete, export and play!
+"""
+dependencies = [
+  "blimgui >= 1.0",
+  "uemath >= 1.0",
+  "coroutines >= 1.1",
+]
+
+[tool.sdkmod]
+name = "BL Map Editor"
+license = {name = "MIT", url = "https://choosealicense.com/licenses/mit/" }
+download = "https://github.com/juso40/BLMapEditor/archive/master.zip"

@@ -1,0 +1,25 @@
+{
+    "Options": {
+        "Quicksettings": true,
+        "Static Meshes": true,
+        "Interactive Objects": false,
+        "Pawns": false,
+        "Prefabs": false,
+        "Draw Debug Box Color": [
+            209,
+            0,
+            255
+        ]
+    },
+    "Keybinds": {
+        "Restore Object Defaults": "Backspace",
+        "Toggle Editor": "F2",
+        "TP To Object": "F4",
+        "Lock Obj in Place": "F3",
+        "Delete Obj": "Delete",
+        "TP my Pawn to me": "F5",
+        "Toggle Preview": "Semicolon",
+        "Toggle Editor Window": "Home"
+    },
+    "AutoEnable": true
+}

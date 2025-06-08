@@ -1,5 +1,5 @@
 [tool.ruff]
-target-version = "py37"
+target-version = "py313"
 line-length = 120
 show-fixes = true
 select = [
@@ -30,8 +30,10 @@ select = [
 ignore = [
     "E713",
     "PLR2004",
-    "ANN101",
     "N999",
+    "ANN401",
+    "TID252",
+    "E731",
 
     # handled by black
     "E1",

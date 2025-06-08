@@ -8,8 +8,8 @@ If you want to go ahead and mess around with it, but don't expect all your creat
 of the editor. As I continue to add features to the editor I may need to rewrite the map loading/saving.  
 
 ## Dependencies
-This mod depends on [blimgui](https://bl-sdk.github.io/mods/blimgui/) and [coroutines](https://bl-sdk.github.io/mods/Coroutines/) to draw the Editor GUI 
-and on [uemath](https://bl-sdk.github.io/mods/UEMathLibrary/) to provide some math functions.
+This mod depends on [blimgui](https://bl-sdk.github.io/willow2-mod-db/mods/blimgui/#blimgui) and [coroutines](https://bl-sdk.github.io/willow2-mod-db/mods/coroutines/) to draw the Editor GUI 
+and on [uemath](https://bl-sdk.github.io/willow2-mod-db/mods/uemath/) to provide some math functions.
 
 ## Controls
 Most controls can be rebinded inside the `Modded Keybinds` menu ingame.
@@ -30,19 +30,28 @@ Download this mod from [here](https://github.com/juso40/BLMapEditor/archive/mast
 Extract all the files from the archive and move them into your games `Win32/Mods/` directory.  
 The files should have following structure:
 ```
-└── Win32/
-    └── Mods/
-         └── MapEditor/
-             ├── __init__.py
-             ├── bl2tools.py
-             ├── canvasutils.py
-             ├── editor.py
-             ├── settings.py
-             ├── undo_redo.py
-             ├── Prefabs/*
-             ├── Maps/*
-             ├── placeablehelper/*
-             └── placeables/*
+Borderlands 2/
+└── Binaries/
+└── DLC/
+└── Documents/
+└── ...
+└── sdk_mods/
+    └── __main__.py/
+    └── *.sdkmod
+    └── *.sdkmod
+    └── *.sdkmod
+    └── *.sdkmod
+    └── MapEditor/
+        ├── __init__.py
+        ├── bl2tools.py
+        ├── canvasutils.py
+        ├── editor.py
+        ├── settings.py
+        ├── undo_redo.py
+        ├── Prefabs/*
+        ├── Maps/*
+        ├── placeablehelper/*
+        └── placeables/*
                
 ```
 
