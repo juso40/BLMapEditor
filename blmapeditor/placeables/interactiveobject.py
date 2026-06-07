@@ -10,16 +10,22 @@ from .placeable import AbstractPlaceable
 if TYPE_CHECKING:
     from common import (
         BaseBalanceDefinition,
+        InteractiveObjectBalanceDefinition,
         InteractiveObjectDefinition,
         MaterialInterface,
         Object,
+        PopulationOpportunityPoint,
         WillowInteractiveObject,
+        WillowPopulationMaster,
+        WillowPopulationOpportunityPoint,
     )
 
     make_vector = Object.Vector.make_struct
+    make_rotator = Object.Rotator.make_struct
 
 else:
     make_vector = make_struct
+    make_rotator = make_struct
 
 
 def _initialize_vending_machine(iobject: unreal.UObject) -> None:
@@ -187,6 +193,7 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
         self.iobject.Location.Y = y
         self.iobject.Location.Z = z
         self.b_default_attributes = False
+        self.iobject.ForceUpdateComponents()
 
     def get_location(self) -> list[float]:
         if not self.iobject:
@@ -199,32 +206,41 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
 
     def instantiate(self) -> tuple[InteractiveObjectPlaceable, list[InteractiveObjectPlaceable]]:
         pc = get_pc()
-        _loc = (pc.Location.X, pc.Location.Y, pc.Location.Z)
-        pop_master = list(find_all("WillowPopulationMaster"))[-1]
+        _loc = make_vector("Vector", X=pc.Location.X, Y=pc.Location.Y, Z=pc.Location.Z)
+        pop_master = cast("WillowPopulationMaster", list(find_all("WillowPopulationMaster"))[-1])
 
         is_bal_def = self.io_definition.Class.Name == "InteractiveObjectBalanceDefinition"
         if is_bal_def:
+            self.io_definition = cast("InteractiveObjectBalanceDefinition", self.io_definition)
             iobject = pop_master.SpawnPopulationControlledActor(
                 self.io_definition.DefaultInteractiveObject.InteractiveObjectClass,
                 None,
                 "",
                 _loc,
-                (0, 0, 0),
+                make_rotator("Rotator", Pitch=0, Yaw=0, Roll=0),
             )
         else:
+            self.io_definition = cast("InteractiveObjectDefinition", self.io_definition)
             iobject = pop_master.SpawnPopulationControlledActor(
                 self.io_definition.InteractiveObjectClass,
                 None,
                 "",
                 _loc,
-                (0, 0, 0),
+                make_rotator("Rotator", Pitch=0, Yaw=0, Roll=0),
             )
 
+        iobject = cast("WillowInteractiveObject", iobject)
         ret = InteractiveObjectPlaceable(self.name, self.io_definition, iobject)
 
         if pc.GetCurrentPlaythrough() != 2:
-            will_pop = list(find_all("WillowPopulationOpportunityPoint"))[1:]
-            pop = list(find_all("PopulationOpportunityPoint"))[1:]
+            will_pop = cast(
+                "list[WillowPopulationOpportunityPoint]",
+                list(find_all("WillowPopulationOpportunityPoint"))[1:],
+            )
+            pop = cast(
+                "list[PopulationOpportunityPoint]",
+                list(find_all("PopulationOpportunityPoint"))[1:],
+            )
             regions = pop if len(pop) > len(will_pop) else will_pop
             region_game_stage = max(pc.GetGameStageFromRegion(x.GameStageRegion) for x in regions if x.GameStageRegion)
         else:
@@ -236,6 +252,7 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
         iobject.PostBeginPlay()
 
         if is_bal_def:
+            self.io_definition = cast("InteractiveObjectBalanceDefinition", self.io_definition)
             x = self.io_definition.SelectGradeIndex(region_game_stage, 0)
             iobject.InitializeBalanceDefinitionState(self.io_definition, x)
             self.io_definition.SetupInteractiveObjectLoot(iobject, x)
@@ -244,10 +261,10 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
             if iobject.Class.Name in ("WillowVendingMachine", "WillowVendingMachineBlackMarket"):
                 _initialize_vending_machine(iobject)
         else:
+            self.io_definition = cast("InteractiveObjectDefinition", self.io_definition)
             iobject.InitializeFromDefinition(self.io_definition, False)
             if "TravelStation" in iobject.InteractiveObjectDefinition.Name:
-                iobject.Class = find_class("FastTravelStation")
-                print(iobject.PathName(iobject))
+                iobject.Class = cast("Object", find_class("FastTravelStation"))
                 _initialize_fast_travel_station(iobject)
                 # This only ever produces WillowInteractiveObject, not TravelStation
 
