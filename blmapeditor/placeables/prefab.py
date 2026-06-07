@@ -151,31 +151,40 @@ class Prefab(AbstractPlaceable):
             # without rotation or scale our move offset is the same as the initial offset
             component.move_offset = component.offset.copy()
 
-    def _calculate_move_offsets(self) -> None:
-        """Update the move offsets of all components after rotation and scale changes."""
-        f, r, u = Rotator(self._rotation).get_axes()
-        scale_x, scale_y, scale_z = self._scale3d
+    def _apply_child_world_transform(self) -> None:
+        """Recompute and apply world position/rotation for all children from parent state + stored local data."""
+        parent_pos = Vector(self._location)
+        parent_rot = Rotator(self._rotation)
+        s_x, s_y, s_z = self._scale3d
+
         for component in self.component_data:
-            offset = Vector(component.offset)
+            local_offset = Vector(component.offset)
+            rotated = local_offset.rotate_around(Vector(), Rotator(self._rotation))
             component.move_offset = list(
-                (self._scale * (offset.x * f * scale_x + offset.y * r * scale_y + offset.z * u * scale_z)).to_tuple(),
+                (self._scale * Vector(x=rotated.x * s_x, y=rotated.y * s_y, z=rotated.z * s_z)).to_tuple(),
             )
+            component.data.set_location((parent_pos + Vector(component.move_offset)).to_tuple())
+
+            local_rot = Rotator(component.rotation)
+            lf, lr, lu = local_rot.get_axes()
+            wf = lf.rotate_around(Vector(), parent_rot)
+            wr = lr.rotate_around(Vector(), parent_rot)
+            wu = lu.rotate_around(Vector(), parent_rot)
+            component.data.set_rotation(Rotator.from_axes(wf, wr, wu).to_tuple())
 
     def instantiate(self) -> tuple[Prefab, list[AbstractPlaceable]]:
         """Place the prefab saved by this instance."""
-        ret = Prefab(self.name)  # we only want to return the instantiated Prefab from our own BP
+        ret = Prefab(self.name)
         new_components = []
         for component in self.component_data:
-            main_obj, new = component.data.instantiate()  # Instantiate our child objects
-            # Set our child objects correct scale and rotation
+            main_obj, new = component.data.instantiate()
             main_obj.set_scale(component.scale)
             main_obj.set_scale3d(component.scale3d)
-            main_obj.set_rotation(component.rotation)
 
             new_components.extend(new)
             ret.component_data.append(
-                Prefab.ComponentData(  # We can just copy the data from our own BP
-                    main_obj,  # only update the child object data
+                Prefab.ComponentData(
+                    main_obj,
                     component.offset.copy(),
                     component.rotation.copy(),
                     component.scale,
@@ -183,7 +192,11 @@ class Prefab(AbstractPlaceable):
                     component.move_offset.copy(),
                 ),
             )
-        ret.set_location(self.get_location())
+        ret._location = self._location.copy()
+        ret._rotation = self._rotation.copy()
+        ret._scale = self._scale
+        ret._scale3d = self._scale3d.copy()
+        ret._apply_child_world_transform()
         return ret, new_components
 
     def get_preview(self) -> AbstractPlaceable:
@@ -205,9 +218,8 @@ class Prefab(AbstractPlaceable):
     def set_scale(self, scale: float) -> None:
         self._scale = scale if scale != 0 else self._scale
         for component in self.component_data:
-            new_scale = component.scale * self._scale  # Scale the initial scaling of our child
-            component.data.set_scale(new_scale)
-        self._calculate_move_offsets()  # update move offsets after scale change
+            component.data.set_scale(component.scale * self._scale)
+        self._apply_child_world_transform()
 
     def get_scale(self) -> float:
         return self._scale
@@ -216,15 +228,15 @@ class Prefab(AbstractPlaceable):
         self.set_scale(self._scale + scale)
 
     def set_rotation(self, rotator: list[int] | tuple[int, int, int]) -> None:
-        self.add_rotation((Rotator(rotator) - Rotator(self._rotation)).to_tuple())
+        self._rotation = list(rotator)
+        self._apply_child_world_transform()
 
     def get_rotation(self) -> list[int]:
         return self._rotation.copy()
 
     def set_location(self, position: list[float] | tuple[float, float, float]) -> None:
         self._location = list(position)
-        for component in self.component_data:
-            component.data.set_location((Vector(component.move_offset) + Vector(position)).to_tuple())
+        self._apply_child_world_transform()
 
     def destroy(self) -> list[AbstractPlaceable]:
         remove: list[AbstractPlaceable] = [
@@ -258,21 +270,8 @@ class Prefab(AbstractPlaceable):
         """Rotate the whole prefab by the given rotator.
         Root object rotates around its own origin, all other objects rotate and move around the root object's origin.
         """
-
-        rotation = Rotator(rotator)  # global rotation Auf Komplett Prefab
-        root_rot = Rotator(self._rotation)
-        self._rotation = list((root_rot + rotation).to_tuple())
-        root_rot = Rotator(self._rotation)
-        self._calculate_move_offsets()  # update move offsets after rotation change
-        f, r, u = root_rot.get_axes()
-        for component in self.component_data:
-            child = component.data
-            child_rotator = Rotator(child.get_rotation())
-            child_rotator.yaw += rotation.yaw
-            cf, cr, cu = child_rotator.get_axes()
-            child_rotator.pitch += r.dot(cf) * rotation.roll
-            child_rotator.roll += f.dot(cf) * rotation.roll
-            child.set_rotation(child_rotator.to_tuple())
+        self._rotation = list((Rotator(self._rotation) + Rotator(rotator)).to_tuple())
+        self._apply_child_world_transform()
 
     def store_default_values(self, default_dict: dict) -> None:
         if not self.component_data:
@@ -312,6 +311,6 @@ class Prefab(AbstractPlaceable):
         s_x, s_y, s_z = self._scale3d
         for component in self.component_data:
             child = component.data
-            c_x, c_y, c_z = component.scale3d  # we need to scale the child by the components initial scale
+            c_x, c_y, c_z = component.scale3d
             child.set_scale3d([c_x * s_x, c_y * s_y, c_z * s_z])
-        self._calculate_move_offsets()
+        self._apply_child_world_transform()

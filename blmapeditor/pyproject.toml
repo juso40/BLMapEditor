@@ -1,13 +1,13 @@
 [project]
 name = "blmapeditor"
-version = "0.1"
+version = "0.2"
 authors = [{ name = "juso" }]
 description = """\
 Place, move, delete, export and play!
 """
 dependencies = [
   "blimgui >= 1.0",
-  "uemath >= 1.0",
+  "uemath >= 1.1",
   "coroutines >= 1.1",
 ]
 
