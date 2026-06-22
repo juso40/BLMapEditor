@@ -16,12 +16,11 @@ def draw_docking_area() -> None:
         | imgui.WindowFlags_.no_resize.value
         | imgui.WindowFlags_.no_move.value
         | imgui.WindowFlags_.no_saved_settings.value
-
         | imgui.WindowFlags_.no_background.value
         | imgui.WindowFlags_.no_decoration.value,
     )
 
     dockspace_id = imgui.get_id("Docking Area")
-    imgui.dock_space(dockspace_id, (0.0, 0.0), imgui.DockNodeFlags_.none.value)
+    imgui.dock_space(dockspace_id, (0.0, 0.0), imgui.DockNodeFlags_.passthru_central_node.value)
 
     imgui.end()
