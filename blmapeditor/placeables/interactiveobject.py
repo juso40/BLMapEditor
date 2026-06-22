@@ -139,6 +139,7 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
         if self.iobject:
             self.iobject.DrawScale = scale
             self.b_default_attributes = False
+            self.iobject.ForceUpdateComponents()
 
     def get_scale(self) -> float:
         if self.iobject:
@@ -148,6 +149,7 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
     def add_scale(self, scale: float) -> None:
         if self.iobject:
             self.iobject.DrawScale += scale
+            self.iobject.ForceUpdateComponents()
 
     def get_scale3d(self) -> list[float]:
         if not self.iobject:
@@ -162,6 +164,7 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
         self.iobject.DrawScale3D.Y = y
         self.iobject.DrawScale3D.Z = z
         self.b_default_attributes = False
+        self.iobject.ForceUpdateComponents()
 
     def set_rotation(self, rotator: list[int] | tuple[int, int, int]) -> None:
         if not self.iobject:
@@ -171,6 +174,7 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
         self.iobject.Rotation.Yaw = yaw
         self.iobject.Rotation.Roll = roll
         self.b_default_attributes = False
+        self.iobject.ForceUpdateComponents()
 
     def get_rotation(self) -> list[int]:
         if not self.iobject:
@@ -184,6 +188,7 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
             self.iobject.Rotation.Yaw += yaw
             self.iobject.Rotation.Roll += roll
             self.b_default_attributes = False
+            self.iobject.ForceUpdateComponents()
 
     def set_location(self, position: list[float] | tuple[float, float, float]) -> None:
         if not self.iobject:
