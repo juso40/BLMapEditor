@@ -14,6 +14,7 @@ show_static_meshes_window = options.HiddenOption[bool | None](identifier="Static
 show_interactive_objects_window = options.HiddenOption[bool | None](identifier="Interactive Objects", value=False)
 show_pawns_window = options.HiddenOption[bool | None](identifier="Pawns", value=False)
 show_prefabs_window = options.HiddenOption[bool | None](identifier="Prefabs", value=False)
+show_packages_window = options.HiddenOption[bool | None](identifier="Packages", value=False)
 
 ALL_OPTIONS: list[options.HiddenOption] = [
     show_quicksettings_window,
@@ -21,5 +22,6 @@ ALL_OPTIONS: list[options.HiddenOption] = [
     show_interactive_objects_window,
     show_pawns_window,
     show_prefabs_window,
+    show_packages_window,
     draw_debug_box_color,
 ]

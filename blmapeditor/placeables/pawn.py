@@ -8,12 +8,23 @@ from unrealsdk import find_all, make_struct, unreal
 from .placeable import AbstractPlaceable
 
 if TYPE_CHECKING:
-    from common import AIPawnBalanceDefinition, MaterialInterface, Object, WillowPawn
+    from common import (
+        Actor,
+        AIPawnBalanceDefinition,
+        MaterialInterface,
+        Object,
+        WillowPawn,
+        WillowAIPawn,
+        WillowPlayerController,
+        WillowPopulationMaster,
+    )
 
     make_vector = Object.Vector.make_struct
+    make_rotator = Object.Rotator.make_struct
 
 else:
     make_vector = make_struct
+    make_rotator = make_struct
 
 
 class AIPawnPlaceable(AbstractPlaceable):
@@ -108,19 +119,19 @@ class AIPawnPlaceable(AbstractPlaceable):
         return make_vector("Vector", X=0, Y=0, Z=0), make_vector("Vector", X=0, Y=0, Z=0)
 
     def instantiate(self) -> tuple[AIPawnPlaceable, list[AIPawnPlaceable]]:
-        pc = get_pc()
-        _loc = (pc.Location.X, pc.Location.Y, pc.Location.Z)
-        pop_master = list(find_all("WillowPopulationMaster"))[-1]
-        pawn = pop_master.SpawnPopulationControlledActor(
-            self.ai_pawn_balance.AIPawnArchetype.Class,
+        pc = cast("WillowPlayerController", get_pc())
+        _loc = pc.Location
+        pop_master = cast("WillowPopulationMaster", list(find_all("WillowPopulationMaster"))[-1])
+        pawn = cast("WillowAIPawn", pop_master.SpawnPopulationControlledActor(
+            cast("Actor", self.ai_pawn_balance.AIPawnArchetype.Class),
             None,
             "",
             _loc,
-            (0, 0, 0),
+            make_rotator("Rotator", Pitch=0, Yaw=0, Roll=0),
             self.ai_pawn_balance.AIPawnArchetype,
             False,
             False,
-        )
+        ))
         ret = AIPawnPlaceable(self.name, self.ai_pawn_balance, pawn)
 
         if pc.GetCurrentPlaythrough() != 2:

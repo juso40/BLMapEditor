@@ -12,7 +12,7 @@ from mods_base import ENGINE, get_pc
 from uemath.constants import URU_1
 from unrealsdk import logging
 
-from . import gui, inputmanager, placeablehelpers, settings
+from . import gui, inputmanager, packagemanager, placeablehelpers, settings
 from . import selectedobject as sobj
 
 __all__: list[str] = ["instance"]
@@ -95,6 +95,8 @@ class Editor:
             logging.dev_warning(f"Map '{abs_path}' does not exist!")
             return
 
+        packagemanager.load_from_json(map_dict)
+
         load_this = map_dict.get(curr_map, None)
         if not load_this:
             logging.info("No Map data for currently loaded map found!")
@@ -123,6 +125,9 @@ class Editor:
         save_this[curr_map] = {}
         for mode in self.placeable_helpers:
             mode.save_map(save_this[curr_map])
+        # Packages are loaded only for kept alive objects
+        # Thus they are map independent as they stay alive
+        packagemanager.save_to_json(save_this)
 
         with open(abs_path, "w") as fp:
             json.dump(save_this, fp)
@@ -284,6 +289,7 @@ class Editor:
         gui.statusbar.draw_statusbar()
         gui.docking_area.draw_docking_area()
         gui.quicksettings.draw_settings_menu()
+        gui.packages.draw_packages_window()
         gui.placeablelist.draw_placeables_window(self.pc or get_pc(), self.placeable_helpers)
 
         imgui.begin("Object Attributes")

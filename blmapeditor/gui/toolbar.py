@@ -21,7 +21,7 @@ CALLBACK_PASTE: Callback = lambda: sobj.HELPER_INSTANCE.paste() if sobj.HELPER_I
 CALLBACK_DELETE: Callback = lambda: sobj.HELPER_INSTANCE.delete_object() if sobj.HELPER_INSTANCE else None
 CALLBACK_TOGGLE_PREFAB: Callback = lambda: sobj.HELPER_INSTANCE.add_to_prefab() if sobj.HELPER_INSTANCE else None
 CALLBACK_SAVE_PREFAB: Callback = saveprefabmodal.draw_save_prefab_modal
-CALLBACK_CANCEL_PREFAB: Callback = lambda: pb.prefab_buffer.clear()
+CALLBACK_CANCEL_PREFAB: Callback = pb.prefab_buffer.clear
 CALLBACK_TP_TO_OBJECT: Callback = lambda: (
     None  # noqa: RUF034
     if sobj.HELPER_INSTANCE and sobj.HELPER_INSTANCE.tp_to_selected_object(cast("WillowPlayerController", get_pc()))

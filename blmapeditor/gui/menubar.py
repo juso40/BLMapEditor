@@ -77,6 +77,7 @@ def _draw_window_menu_items() -> None:
         ("Interactive Objects", settings.show_interactive_objects_window),
         ("Pawns", settings.show_pawns_window),
         ("Prefabs", settings.show_prefabs_window),
+        ("Packages", settings.show_packages_window),
     ]:
         if imgui.menu_item(
             f"{'Hide' if option.value else 'Show'} {name}",
@@ -136,7 +137,6 @@ While it technically is almost feature complete, it is no where near polished.
 Expect bugs, crashes, and other issues. If you find any, please report them on the GitHub page.
 
 If you have any suggestions, or would like to contribute, please feel free to do so!
-
 
 """,
     )
