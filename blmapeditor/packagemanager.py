@@ -5,6 +5,7 @@ from unrealsdk import find_object, logging
 
 loaded_objects: dict[str, list[str]] = {}  # package name -> list of kept alive objects
 
+
 def _keep_alive(path_name: str, undo: bool = False) -> bool:
     try:
         obj = find_object("Object", path_name)
@@ -17,6 +18,7 @@ def _keep_alive(path_name: str, undo: bool = False) -> bool:
         obj.ObjectFlags |= 0x4000
     return True
 
+
 def add_package(name: str) -> None:
     """Add a package to the loaded packages set without loading it yet."""
     if name not in loaded_objects:
@@ -26,11 +28,22 @@ def add_package(name: str) -> None:
         logging.info(f"Package '{name}' is already loaded.")
 
 
+def remove_package(name: str) -> None:
+    """Remove a package and release all its kept-alive objects."""
+    if name in loaded_objects:
+        for obj_path in loaded_objects[name]:
+            _keep_alive(obj_path, undo=True)
+            logging.info(f"Released object: {obj_path}")
+        del loaded_objects[name]
+        logging.info(f"Removed package: {name}")
+    else:
+        logging.warning(f"Package '{name}' not found in loaded packages.")
+
+
 def load_package(name: str) -> bool:
     """Load an Unreal package by name and track it."""
     try:
         unrealsdk.load_package(name)
-        loaded_objects.setdefault(name, [])
         logging.info(f"Loaded package: {name}")
         return True
     except Exception as e:  # noqa: BLE001
@@ -40,9 +53,10 @@ def load_package(name: str) -> bool:
 
 def keep_alive(path_name: str, package: str) -> bool:
     """Keep a UObject alive by holding a persistent Python reference."""
-    if path_name in loaded_objects:
+    if (objs := loaded_objects.get(package)) and path_name in objs:
         logging.info(f"Object '{path_name}' is already kept alive.")
         return True
+    load_package(package)  # Ensure the package is loaded before keeping the object alive
     if not _keep_alive(path_name):
         logging.error(f"Failed to keep object alive: {path_name}")
         return False
@@ -53,20 +67,18 @@ def keep_alive(path_name: str, package: str) -> bool:
 
 def release_object(path_name: str, package: str) -> None:
     """Release a single kept-alive object, allowing it to be GC'd."""
-    if path_name in loaded_objects:
+    if (objs := loaded_objects.get(package)) and path_name in objs:
         _keep_alive(path_name, undo=True)
-        if package in loaded_objects:
-            if path_name in loaded_objects[package]:
-                loaded_objects[package].remove(path_name)
-                logging.info(f"Released object: {path_name}")
-            else:
-                logging.warning(f"Object '{path_name}' not found in package '{package}'.")
+        objs.remove(path_name)
+        logging.info(f"Released object: {path_name}")
+    else:
+        logging.warning(f"Object '{path_name}' not found in package '{package}'.")
 
 
 def save_to_json(map_data: dict) -> None:
     """Write the current package/object state into the map JSON dict."""
     if not loaded_objects:
-        return    
+        return
     map_data["LoadedObjects"] = loaded_objects
 
 

@@ -3,44 +3,59 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from mods_base import ENGINE, get_pc
-from unrealsdk import construct_object, find_all, find_class, find_object, make_struct, unreal
+from unrealsdk import construct_object, find_all, find_class, find_enum, find_object, make_struct, unreal
 
 from .placeable import AbstractPlaceable
 
 if TYPE_CHECKING:
     from common import (
+        AttributeInitializationDefinition,
         BaseBalanceDefinition,
+        BlackMarketDefinition,
         InteractiveObjectBalanceDefinition,
         InteractiveObjectDefinition,
+        IShop,
         MaterialInterface,
         Object,
         PopulationOpportunityPoint,
         WillowInteractiveObject,
         WillowPopulationMaster,
         WillowPopulationOpportunityPoint,
+        WillowVendingMachine,
+        WillowVendingMachineBase,
+        WillowVendingMachineBlackMarket,
     )
 
     make_vector = Object.Vector.make_struct
     make_rotator = Object.Rotator.make_struct
+    make_attribute_initialization_data = AttributeInitializationDefinition.AttributeInitializationData.make_struct
 
+    find_enum_shop_type = IShop.EShopType.find_enum
 else:
     make_vector = make_struct
     make_rotator = make_struct
+    make_attribute_initialization_data = make_struct
+    find_enum_shop_type = find_enum
+
+e_shop_type = find_enum_shop_type("EShopType")
 
 
-def _initialize_vending_machine(iobject: unreal.UObject) -> None:
+def _initialize_vending_machine(iobject: WillowVendingMachineBase) -> None:
     vending_name: str = iobject.InteractiveObjectDefinition._path_name().lower()
 
     if "health" in vending_name:
-        iobject.ShopType = 2
+        iobject.ShopType = e_shop_type.SType_Health
     elif "ammo" in vending_name:
-        iobject.ShopType = 1
+        iobject.ShopType = e_shop_type.SType_Items
     else:
-        iobject.ShopType = 0
+        iobject.ShopType = e_shop_type.SType_Weapons
 
-    gamestage = find_object(
+    gamestage = cast(
         "AttributeInitializationDefinition",
-        "GD_Population_Shopping.Balance.Init_FeaturedItem_GameStage",
+        find_object(
+            "AttributeInitializationDefinition",
+            "GD_Population_Shopping.Balance.Init_FeaturedItem_GameStage",
+        ),
     )
     if "seraph" in vending_name:
         iobject.FixedItemCost = 120
@@ -52,47 +67,87 @@ def _initialize_vending_machine(iobject: unreal.UObject) -> None:
         iobject.FixedItemCost = -1
         iobject.FixedFeaturedItemCost = 613
         iobject.FormOfCurrency = 4
-        markup = find_object(
+        markup = cast(
             "AttributeInitializationDefinition",
-            "GD_Iris_TorgueTokenVendor.CommerceMarkup",
+            find_object(
+                "AttributeInitializationDefinition",
+                "GD_Iris_TorgueTokenVendor.CommerceMarkup",
+            ),
         )
-        gamestage = find_object(
+        gamestage = cast(
             "AttributeInitializationDefinition",
-            "GD_Iris_TorgueTokenVendor.Balance.Init_FeaturedItem_GameStage",
+            find_object(
+                "AttributeInitializationDefinition",
+                "GD_Iris_TorgueTokenVendor.Balance.Init_FeaturedItem_GameStage",
+            ),
         )
         awesome = None
     else:
         iobject.FixedItemCost = -1
         iobject.FixedFeaturedItemCost = -1
         iobject.FormOfCurrency = 0
-        markup = find_object(
+        markup = cast(
             "AttributeInitializationDefinition",
-            "GD_Economy.VendingMachine.Init_MarkupCalc_P1",
+            find_object(
+                "AttributeInitializationDefinition",
+                "GD_Economy.VendingMachine.Init_MarkupCalc_P1",
+            ),
         )
-        awesome = find_object(
+        awesome = cast(
             "AttributeInitializationDefinition",
-            "GD_Population_Shopping.Balance.Init_FeaturedItem_AwesomeLevel",
+            find_object(
+                "AttributeInitializationDefinition",
+                "GD_Population_Shopping.Balance.Init_FeaturedItem_AwesomeLevel",
+            ),
         )
 
     iobject.bOverrideFormOfCurrency = True
-
-    iobject.CommerceMarkup = (1, None, markup, 1)
-    iobject.InventoryConfigurationName = "Inventory"
-    iobject.FeaturedItemCommerceMarkup = (int("torgue" in vending_name), None, markup, 1)
-    iobject.FeaturedItemConfigurationName = "FeaturedItem"
-    iobject.FeaturedItemGameStage = (int(awesome is None), None, gamestage, 1)
-    iobject.FeaturedItemAwesomeLevel = (0, None, awesome, 1)
-
-    iobject.ResetInventory()
-
     if "blackmarket" in vending_name:
+        iobject = cast("WillowVendingMachineBlackMarket", iobject)
         iobject.ShopType = 3
-        iobject.DefinitionData = find_object(
+        iobject.DefinitionData = cast(
             "BlackMarketDefinition",
-            "GD_BlackMarket.BlackMarket.MarketDef_BlackMarket",
+            find_object(
+                "BlackMarketDefinition",
+                "GD_BlackMarket.BlackMarket.MarketDef_BlackMarket",
+            ),
         )
         iobject.FixedItemCost = 0
         iobject.FixedFeaturedItemCost = 0
+    else:
+        iobject = cast("WillowVendingMachine", iobject)
+        iobject.CommerceMarkup = make_attribute_initialization_data(
+            "AttributeInitializationData",
+            BaseValueConstant=1,
+            BaseValueAttribute=None,
+            InitializationDefinition=markup,
+            BaseValueScaleConstant=1,
+        )
+        iobject.InventoryConfigurationName = "Inventory"
+        iobject.FeaturedItemCommerceMarkup = make_attribute_initialization_data(
+            "AttributeInitializationData",
+            BaseValueConstant=int("torgue" in vending_name),
+            BaseValueAttribute=None,
+            InitializationDefinition=markup,
+            BaseValueScaleConstant=1,
+        )
+        iobject.FeaturedItemConfigurationName = "FeaturedItem"
+        iobject.FeaturedItemGameStage = make_attribute_initialization_data(
+            "AttributeInitializationData",
+            BaseValueConstant=int(awesome is None),
+            BaseValueAttribute=None,
+            InitializationDefinition=gamestage,
+            BaseValueScaleConstant=1,
+        )
+        iobject.FeaturedItemAwesomeLevel = make_attribute_initialization_data(
+            "AttributeInitializationData",
+            BaseValueConstant=0,
+            BaseValueAttribute=None,
+            InitializationDefinition=awesome,
+            BaseValueScaleConstant=1,
+        )
+
+    iobject.ResetInventory()
 
 
 def _initialize_fast_travel_station(iobject: unreal.UObject) -> None:
@@ -264,7 +319,7 @@ class InteractiveObjectPlaceable(AbstractPlaceable):
             iobject.InitializeFromDefinition(self.io_definition.DefaultInteractiveObject, False)
 
             if iobject.Class.Name in ("WillowVendingMachine", "WillowVendingMachineBlackMarket"):
-                _initialize_vending_machine(iobject)
+                _initialize_vending_machine(cast("WillowVendingMachineBase", iobject))
         else:
             self.io_definition = cast("InteractiveObjectDefinition", self.io_definition)
             iobject.InitializeFromDefinition(self.io_definition, False)

@@ -18,7 +18,7 @@ def draw_packages_window() -> None:
     imgui.spacing()
     imgui.separator()
     imgui.spacing()
-    for package, objects in packagemanager.loaded_objects.items():
+    for package, objects in packagemanager.loaded_objects.copy().items():
         _draw_kept_alive_objects_section(package, objects)
     imgui.end()
 
@@ -40,7 +40,13 @@ def _draw_load_package() -> None:
 
 
 def _draw_kept_alive_objects_section(package: str, objects: list[str]) -> None:
-    if not imgui.collapsing_header(package):
+    remove_package = imgui.button(f"{icons_fontawesome_4.ICON_FA_TRASH}##Clear{package}")
+    imgui.same_line()
+    opened = imgui.collapsing_header(package)
+
+    if not opened:
+        if remove_package:
+            packagemanager.remove_package(package)
         return
     global _OBJECT_INPUT_BUFFER  # noqa: PLW0603
     imgui.text("Kept Alive Objects")
@@ -67,3 +73,5 @@ def _draw_kept_alive_objects_section(package: str, objects: list[str]) -> None:
 
     if to_release:
         packagemanager.release_object(to_release, package)
+    if remove_package:
+        packagemanager.remove_package(package)
