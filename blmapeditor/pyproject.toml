@@ -1,6 +1,6 @@
 [project]
 name = "blmapeditor"
-version = "0.4"
+version = "0.5"
 authors = [{ name = "juso" }]
 description = """\
 Place, move, delete, export and play!
