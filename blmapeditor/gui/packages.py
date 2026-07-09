@@ -7,6 +7,7 @@ from .. import packagemanager, settings
 
 _PACKAGE_INPUT_BUFFER: str = ""
 _OBJECT_INPUT_BUFFER: str = ""
+_PATH_NAME_NOT_FOUND: str = ""
 
 
 def draw_packages_window() -> None:
@@ -20,6 +21,7 @@ def draw_packages_window() -> None:
     imgui.spacing()
     for package, objects in packagemanager.loaded_objects.copy().items():
         _draw_kept_alive_objects_section(package, objects)
+    _modal()
     imgui.end()
 
 
@@ -49,6 +51,7 @@ def _draw_kept_alive_objects_section(package: str, objects: list[str]) -> None:
             packagemanager.remove_package(package)
         return
     global _OBJECT_INPUT_BUFFER  # noqa: PLW0603
+    global _PATH_NAME_NOT_FOUND  # noqa: PLW0603
     imgui.text("Kept Alive Objects")
     imgui.spacing()
 
@@ -56,8 +59,9 @@ def _draw_kept_alive_objects_section(package: str, objects: list[str]) -> None:
     imgui.same_line()
     if imgui.button("Keep Alive"):
         val_stripped = _OBJECT_INPUT_BUFFER.strip()
-        if val_stripped:
-            packagemanager.keep_alive(val_stripped, package)
+        if val_stripped and not packagemanager.keep_alive(val_stripped, package):
+            imgui.open_popup("Object Not Found")
+            _PATH_NAME_NOT_FOUND = val_stripped
         _OBJECT_INPUT_BUFFER = ""
     if imgui.is_item_hovered():
         imgui.set_tooltip("Keep an arbitrary UObject alive by full path name.")
@@ -75,3 +79,20 @@ def _draw_kept_alive_objects_section(package: str, objects: list[str]) -> None:
         packagemanager.release_object(to_release, package)
     if remove_package:
         packagemanager.remove_package(package)
+
+
+def _modal() -> None:
+    if imgui.begin_popup_modal(
+        name="Object Not Found",
+        flags=(
+            imgui.WindowFlags_.always_auto_resize.value
+            | imgui.WindowFlags_.no_move.value
+            | imgui.WindowFlags_.no_resize.value
+        ),
+    )[0]:
+        imgui.text("Could not find the object:")
+        imgui.same_line()
+        imgui.input_text("##ObjectNotFound", _PATH_NAME_NOT_FOUND, imgui.InputTextFlags_.read_only.value)
+        if imgui.button("OK"):
+            imgui.close_current_popup()
+        imgui.end_popup()
