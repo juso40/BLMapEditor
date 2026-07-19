@@ -9,7 +9,7 @@ loaded_objects: dict[str, list[str]] = {}  # package name -> list of kept alive 
 def _keep_alive(path_name: str, undo: bool = False) -> bool:
     try:
         obj = find_object("Object", path_name)
-    except Exception as e:  # noqa: BLE001
+    except ValueError as e: 
         logging.error(f"Error finding object '{path_name}': {e}")
         return False
     if undo:

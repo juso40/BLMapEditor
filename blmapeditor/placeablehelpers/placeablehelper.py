@@ -56,9 +56,11 @@ class PlaceableHelper(ABC):
 
     def on_enable(self) -> None:
         if self.b_setup:
-            self.setup(ENGINE.GetCurrentWorldInfo().GetStreamingPersistentMapName().lower())
-            self.b_setup = False
-            self.is_cache_dirty = True
+            mapname = ENGINE.GetCurrentWorldInfo().GetStreamingPersistentMapName().lower()
+            if mapname not in ("menumap", "none", ""):
+                self.setup(mapname)
+                self.b_setup = False
+                self.is_cache_dirty = True
 
     def on_disable(self) -> None:
         sobj.destroy_preview()
